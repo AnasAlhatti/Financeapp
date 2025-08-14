@@ -1,7 +1,5 @@
 package com.example.financeapp.feature_transaction.presentation.budgets
 
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.financeapp.feature_transaction.domain.model.Budget
@@ -18,15 +16,15 @@ import kotlin.math.abs
 data class BudgetUi(
     val budget: Budget,
     val spentThisMonth: Double,
-    val progress: Float, // 0..1 (cap later)
+    val progress: Float, // 0..1
     val over: Boolean
 )
 
 data class BudgetsState(
-    val items: List<BudgetUi> = emptyList()
+    val items: List<BudgetUi> = emptyList(),
+    val categories: List<String> = emptyList() // ✅ suggest from existing tx
 )
 
-@RequiresApi(Build.VERSION_CODES.O)
 @HiltViewModel
 class BudgetsViewModel @Inject constructor(
     private val budgetUse: BudgetUseCases,
@@ -34,11 +32,10 @@ class BudgetsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(BudgetsState())
-    val state = _state.asStateFlow()
+    val state: StateFlow<BudgetsState> = _state.asStateFlow()
 
     init { observe() }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     private fun observe() {
         val zone = ZoneId.systemDefault()
         val ym = YearMonth.now()
@@ -50,19 +47,23 @@ class BudgetsViewModel @Inject constructor(
             txUse.getTransactions()
         ) { budgets, txs ->
             val monthTxs = txs.filter { it.date in start until end }
-            budgets.map { b ->
+            val categories = txs.map { it.category }.distinct().sorted()
+
+            val uiItems = budgets.map { b ->
                 val spent = monthTxs
-                    .filter { it.category == b.category && it.amount < 0 } // expenses only
+                    .filter { it.category == b.category && it.amount < 0 }
                     .sumOf { abs(it.amount) }
                 val progress = if (b.limitAmount <= 0) 0f else (spent / b.limitAmount).toFloat()
                 BudgetUi(
                     budget = b,
                     spentThisMonth = spent,
-                    progress = progress.coerceAtMost(1.0f),
+                    progress = progress.coerceAtMost(1f),
                     over = spent > b.limitAmount
                 )
             }.sortedBy { it.budget.category }
-        }.onEach { _state.value = BudgetsState(it) }
+
+            BudgetsState(items = uiItems, categories = categories)
+        }.onEach { _state.value = it }
             .launchIn(viewModelScope)
     }
 

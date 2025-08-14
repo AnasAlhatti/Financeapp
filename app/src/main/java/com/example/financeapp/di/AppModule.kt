@@ -66,12 +66,4 @@ object AppModule {
     fun provideBudgetRepository(dao: BudgetDao): BudgetRepository =
         BudgetRepositoryImpl(dao)
 
-    @Provides @Singleton
-    fun provideBudgetUseCases(repo: BudgetRepository): BudgetUseCases =
-        BudgetUseCases(
-            getBudgets = GetBudgets(repo),
-            upsertBudget = UpsertBudget(repo),
-            deleteBudget = DeleteBudget(repo)
-        )
-
 }
