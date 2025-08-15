@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.financeapp.feature_transaction.domain.model.Transaction
+import com.example.financeapp.feature_transaction.presentation.budgets.BudgetWarningsBanner
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.time.YearMonth
@@ -48,21 +49,20 @@ fun TransactionListScreen(
     val scope = rememberCoroutineScope()
 
     var showMonthPicker by remember { mutableStateOf(false) }
+    val budgetsVm: com.example.financeapp.feature_transaction.presentation.budgets.BudgetsSummaryViewModel = hiltViewModel()
+    val warnings by budgetsVm.warnings.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Transactions") },
                 actions = {
-                    // Quick Reports icon (keep if you like)
                     IconButton(onClick = onOpenReports) {
                         Icon(
                             imageVector = Icons.Outlined.Insights,
                             contentDescription = "Reports"
                         )
                     }
-
-                    // Overflow menu for Budgets (and optionally Reports too)
                     var overflow by remember { mutableStateOf(false) }
                     IconButton(onClick = { overflow = true }) {
                         Icon(
@@ -75,7 +75,6 @@ fun TransactionListScreen(
                             text = { Text("Budgets") },
                             onClick = { overflow = false; onOpenBudgets() }
                         )
-                        // Optional duplicate entry to Reports from menu:
                         DropdownMenuItem(
                             text = { Text("Reports") },
                             onClick = { overflow = false; onOpenReports() }
@@ -92,13 +91,24 @@ fun TransactionListScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            Text("Transactions", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
+            // ⬇️ REMOVE this line:
+            // Text("Transactions", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
+
+            // optional small spacer so the header doesn't feel cramped
+            Spacer(Modifier.height(4.dp))
 
             TotalsHeader(
                 income = currencyFormat.format(uiState.totalIncome),
                 expense = currencyFormat.format(uiState.totalExpense),
                 balance = currencyFormat.format(uiState.balance),
                 modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
+            BudgetWarningsBanner(
+                warnings = warnings,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp)
             )
 
             FilterBar(

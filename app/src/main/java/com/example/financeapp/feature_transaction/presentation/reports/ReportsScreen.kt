@@ -41,6 +41,9 @@ fun ReportsScreen(
 
     var showMonthPicker by remember { mutableStateOf(false) }
 
+    val budgetsVm: com.example.financeapp.feature_transaction.presentation.budgets.BudgetsSummaryViewModel = hiltViewModel()
+    val warnings by budgetsVm.warnings.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -59,7 +62,7 @@ fun ReportsScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
         ) {
-            // Filter Bar (reusing your compact bar)
+            // Filter Bar (reusing compact bar)
             FilterBar(
                 dateRange = ui.dateRange,
                 selectedMonth = ui.selectedMonth,
@@ -94,7 +97,43 @@ fun ReportsScreen(
                     Text(ui.total.formatCurrency(), style = MaterialTheme.typography.titleLarge)
                 }
             }
+            if (warnings.isNotEmpty()) {
+                val nf = remember { java.text.NumberFormat.getCurrencyInstance() }
+                Spacer(Modifier.height(12.dp))
+                ElevatedCard(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Budgets at a glance", style = MaterialTheme.typography.titleSmall)
 
+                        warnings.take(3).forEach { w ->
+                            val ratio = w.ratio
+                            val level = com.example.financeapp.feature_transaction.presentation.budgets.levelForRatio(ratio)
+                            val barColor = com.example.financeapp.feature_transaction.presentation.budgets.colorForLevel(level)
+
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(w.category, color = barColor, style = MaterialTheme.typography.bodyMedium)
+                                LinearProgressIndicator(
+                                    progress = { ratio.toFloat().coerceAtMost(1f) },
+                                    color = barColor,
+                                    trackColor = barColor.copy(alpha = 0.15f)
+                                )
+                                Text(
+                                    text = "${nf.format(w.spent)} / ${nf.format(w.limit)}  •  ${(ratio * 100).toInt()}%",
+                                    color = barColor,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+
+                        // Optional legend (kept as-is)
+                        Spacer(Modifier.height(8.dp))
+                        BudgetLegend()
+                    }
+                }
+            }
             Spacer(Modifier.height(16.dp))
 
             // Category totals bar
@@ -118,6 +157,33 @@ fun ReportsScreen(
                 showMonthPicker = false
             }
         )
+    }
+}
+
+@Composable
+private fun BudgetLegend() {
+    // Uses Material theme colors to explain the risk mapping.
+    // <60% -> primary, 60–80% -> secondary, 80–100% -> tertiary, >100% -> error
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Legend", style = MaterialTheme.typography.labelMedium)
+        LegendRow(color = MaterialTheme.colorScheme.primary, label = "< 60% (OK)")
+        LegendRow(color = MaterialTheme.colorScheme.secondary, label = "60–80% (Caution)")
+        LegendRow(color = MaterialTheme.colorScheme.tertiary, label = "80–100% (Warning)")
+        LegendRow(color = MaterialTheme.colorScheme.error, label = "> 100% (Over)")
+    }
+}
+
+@Composable
+private fun LegendRow(color: androidx.compose.ui.graphics.Color, label: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Surface(
+            color = color,
+            contentColor = color,
+            tonalElevation = 0.dp,
+            modifier = Modifier
+                .size(14.dp)
+        ) {}
+        Text(label, style = MaterialTheme.typography.bodySmall, color = color)
     }
 }
 
@@ -171,10 +237,6 @@ private fun CategoryBarChart(ui: ReportsUiState) {
     )
 }
 
-
-
-
-
 /** Daily totals over the selected window. */
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -218,7 +280,6 @@ private fun DailyBarChart(ui: ReportsUiState) {
     )
 }
 
-
 @Composable
 private fun EmptyChartPlaceholder(message: String) {
     Surface(
@@ -240,7 +301,6 @@ private fun EmptyChartPlaceholder(message: String) {
         }
     }
 }
-
 
 private fun Double.formatCurrency(): String {
     val nf = java.text.NumberFormat.getCurrencyInstance()

@@ -1,18 +1,29 @@
 package com.example.financeapp.feature_transaction.presentation.add_edit
 
+import android.content.Context
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.financeapp.feature_transaction.domain.model.Transaction
 import com.example.financeapp.feature_transaction.domain.use_case.TransactionUseCases
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.YearMonth
+import java.time.ZoneId
 import javax.inject.Inject
+import kotlin.math.abs
+
 
 @HiltViewModel
 class AddEditTransactionViewModel @Inject constructor(
-    private val useCases: TransactionUseCases
+    private val useCases: TransactionUseCases,
+    private val budgetUseCases: com.example.financeapp.feature_transaction.domain.use_case.budget.BudgetUseCases,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AddEditTransactionState())
@@ -71,6 +82,40 @@ class AddEditTransactionViewModel @Inject constructor(
             useCases.addTransaction(tx)
             _state.value = _state.value.copy(isSaving = false)
             onSuccess()
+        }
+    }
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun checkBudgetThresholdsAfterSave(tx: com.example.financeapp.feature_transaction.domain.model.Transaction) {
+        // Only for expenses within this month
+        if (tx.amount >= 0) return
+        viewModelScope.launch {
+            val zone = ZoneId.systemDefault()
+            val ym = YearMonth.now()
+            val start = ym.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            val end = ym.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+
+            val budgets = budgetUseCases.getBudgets().first()
+            val budget = budgets.firstOrNull { it.category == tx.category } ?: return@launch
+
+            val txs = useCases.getTransactions().first().filter { it.date in start until end && it.category == tx.category && it.amount < 0 }
+            val spentAfter = txs.sumOf { abs(it.amount) }
+            val spentBefore = spentAfter - abs(tx.amount)
+
+            val limit = budget.limitAmount
+            if (limit <= 0) return@launch
+
+            val beforePct = (spentBefore / limit) * 100.0
+            val afterPct  = (spentAfter  / limit) * 100.0
+
+            // fire only on crossing upward
+            val crossed100 = beforePct < 100 && afterPct >= 100
+            val crossed80  = beforePct < 80  && afterPct >= 80
+
+            if (crossed100) {
+                com.example.financeapp.feature_transaction.presentation.budgets.BudgetNotifier.notifyThreshold(appContext, tx.category, 100)
+            } else if (crossed80) {
+                com.example.financeapp.feature_transaction.presentation.budgets.BudgetNotifier.notifyThreshold(appContext, tx.category, 80)
+            }
         }
     }
 

@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -68,6 +67,11 @@ fun BudgetsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(state.items, key = { it.budget.id ?: it.budget.category.hashCode() }) { ui ->
+                    // ratio & color from XML palette
+                    val ratio = if (ui.budget.limitAmount > 0.0) ui.spentThisMonth / ui.budget.limitAmount else 0.0
+                    val level = com.example.financeapp.feature_transaction.presentation.budgets.levelForRatio(ratio)
+                    val barColor = com.example.financeapp.feature_transaction.presentation.budgets.colorForLevel(level)
+
                     ElevatedCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp)) {
                             Row(
@@ -75,15 +79,20 @@ fun BudgetsScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(ui.budget.category, style = MaterialTheme.typography.titleMedium)
-                                IconButton(onClick = {
-                                    viewModel.delete(ui.budget)
-                                }) { Icon(Icons.Filled.Delete, contentDescription = "Delete") }
+                                Text(
+                                    ui.budget.category,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = barColor
+                                )
+                                IconButton(onClick = { viewModel.delete(ui.budget) }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                                }
                             }
                             Spacer(Modifier.height(6.dp))
                             LinearProgressIndicator(
                                 progress = { ui.progress },
-                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                color = barColor,
+                                trackColor = barColor.copy(alpha = 0.15f),
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Spacer(Modifier.height(6.dp))
@@ -91,7 +100,7 @@ fun BudgetsScreen(
                                 text = "${nf.format(ui.spentThisMonth)} / ${nf.format(ui.budget.limitAmount)}" +
                                         if (ui.over) " (over)" else "",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (ui.over) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = barColor
                             )
                             Spacer(Modifier.height(8.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
