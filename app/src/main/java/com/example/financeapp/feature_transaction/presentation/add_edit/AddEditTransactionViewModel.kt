@@ -8,7 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.financeapp.feature_transaction.domain.model.Frequency
 import com.example.financeapp.feature_transaction.domain.model.RecurringRule
 import com.example.financeapp.feature_transaction.domain.model.Transaction
-import com.example.financeapp.feature_transaction.domain.use_case.TransactionUseCases
+import com.example.financeapp.feature_transaction.domain.use_case.transaction.TransactionUseCases
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow

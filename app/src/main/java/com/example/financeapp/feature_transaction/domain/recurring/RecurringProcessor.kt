@@ -3,14 +3,12 @@ package com.example.financeapp.feature_transaction.domain.recurring
 import android.os.Build
 import androidx.annotation.RequiresApi
 import com.example.financeapp.feature_transaction.domain.model.Transaction
-import com.example.financeapp.feature_transaction.domain.model.RecurringRule
-import com.example.financeapp.feature_transaction.domain.use_case.AddTransaction
+import com.example.financeapp.feature_transaction.domain.use_case.transaction.AddTransaction
 import com.example.financeapp.feature_transaction.domain.repository.RecurringRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
-import kotlin.math.min
 import kotlin.repeat
 
 class RecurringProcessor(

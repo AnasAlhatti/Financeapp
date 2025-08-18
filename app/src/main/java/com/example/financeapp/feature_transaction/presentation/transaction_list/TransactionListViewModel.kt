@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.financeapp.feature_transaction.domain.model.RecurringRule
 import com.example.financeapp.feature_transaction.domain.model.Transaction
-import com.example.financeapp.feature_transaction.domain.use_case.TransactionUseCases
+import com.example.financeapp.feature_transaction.domain.use_case.transaction.TransactionUseCases
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -14,7 +14,6 @@ import java.time.*
 import java.time.temporal.TemporalAdjusters
 import java.time.temporal.WeekFields
 import javax.inject.Inject
-import kotlin.math.abs
 
 enum class DateRange { ALL, THIS_WEEK, THIS_MONTH, LAST_30D, MONTH }
 enum class AmountFilter { ALL, INCOME, EXPENSE }

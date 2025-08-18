@@ -1,4 +1,4 @@
-package com.example.financeapp.feature_transaction.domain.use_case
+package com.example.financeapp.feature_transaction.domain.use_case.transaction
 
 data class TransactionUseCases(
     val getTransactions: GetTransactions,

@@ -4,7 +4,7 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.financeapp.feature_transaction.domain.use_case.TransactionUseCases
+import com.example.financeapp.feature_transaction.domain.use_case.transaction.TransactionUseCases
 import com.example.financeapp.feature_transaction.presentation.transaction_list.AmountFilter
 import com.example.financeapp.feature_transaction.presentation.transaction_list.DateRange
 import dagger.hilt.android.lifecycle.HiltViewModel

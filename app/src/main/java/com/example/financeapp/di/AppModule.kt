@@ -10,15 +10,11 @@ import com.example.financeapp.feature_transaction.data.repository.BudgetReposito
 import com.example.financeapp.feature_transaction.data.repository.TransactionRepositoryImpl
 import com.example.financeapp.feature_transaction.domain.repository.BudgetRepository
 import com.example.financeapp.feature_transaction.domain.repository.TransactionRepository
-import com.example.financeapp.feature_transaction.domain.use_case.AddTransaction
-import com.example.financeapp.feature_transaction.domain.use_case.DeleteTransaction
-import com.example.financeapp.feature_transaction.domain.use_case.GetTransactionById
-import com.example.financeapp.feature_transaction.domain.use_case.GetTransactions
-import com.example.financeapp.feature_transaction.domain.use_case.TransactionUseCases
-import com.example.financeapp.feature_transaction.domain.use_case.budget.BudgetUseCases
-import com.example.financeapp.feature_transaction.domain.use_case.budget.DeleteBudget
-import com.example.financeapp.feature_transaction.domain.use_case.budget.GetBudgets
-import com.example.financeapp.feature_transaction.domain.use_case.budget.UpsertBudget
+import com.example.financeapp.feature_transaction.domain.use_case.transaction.AddTransaction
+import com.example.financeapp.feature_transaction.domain.use_case.transaction.DeleteTransaction
+import com.example.financeapp.feature_transaction.domain.use_case.transaction.GetTransactionById
+import com.example.financeapp.feature_transaction.domain.use_case.transaction.GetTransactions
+import com.example.financeapp.feature_transaction.domain.use_case.transaction.TransactionUseCases
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -89,7 +85,7 @@ object AppModule {
     @Provides @Singleton
     fun provideRecurringProcessor(
         recurringRepo: com.example.financeapp.feature_transaction.domain.repository.RecurringRepository,
-        addTransaction: com.example.financeapp.feature_transaction.domain.use_case.AddTransaction,
+        addTransaction: AddTransaction,
         txRepo: com.example.financeapp.feature_transaction.domain.repository.TransactionRepository
     ): com.example.financeapp.feature_transaction.domain.recurring.RecurringProcessor =
         com.example.financeapp.feature_transaction.domain.recurring.RecurringProcessor(

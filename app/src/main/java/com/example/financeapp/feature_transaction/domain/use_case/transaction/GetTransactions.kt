@@ -1,4 +1,4 @@
-package com.example.financeapp.feature_transaction.domain.use_case
+package com.example.financeapp.feature_transaction.domain.use_case.transaction
 
 import com.example.financeapp.feature_transaction.domain.model.Transaction
 import com.example.financeapp.feature_transaction.domain.repository.TransactionRepository
