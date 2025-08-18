@@ -3,6 +3,7 @@ package com.example.financeapp.di
 import android.app.Application
 import androidx.room.Room
 import com.example.financeapp.feature_transaction.data.local.BudgetDao
+import com.example.financeapp.feature_transaction.data.local.Migrations
 import com.example.financeapp.feature_transaction.data.local.TransactionDao
 import com.example.financeapp.feature_transaction.data.local.TransactionDatabase
 import com.example.financeapp.feature_transaction.data.repository.BudgetRepositoryImpl
@@ -31,11 +32,9 @@ object AppModule {
     @Provides
     @Singleton
     fun provideTransactionDatabase(app: Application): TransactionDatabase {
-        return Room.databaseBuilder(
-            app,
-            TransactionDatabase::class.java,
-            "transaction_db"
-        ).build()
+        return Room.databaseBuilder(app, TransactionDatabase::class.java, "transaction_db")
+            .addMigrations(Migrations.MIGRATION_2_3, Migrations.MIGRATION_3_4)
+            .build()
     }
 
     @Provides
@@ -65,5 +64,36 @@ object AppModule {
     @Provides @Singleton
     fun provideBudgetRepository(dao: BudgetDao): BudgetRepository =
         BudgetRepositoryImpl(dao)
+
+    // DAOs
+    @Provides @Singleton
+    fun provideRecurringDao(db: TransactionDatabase) = db.recurringDao
+
+    // Repository
+    @Provides @Singleton
+    fun provideRecurringRepository(dao: com.example.financeapp.feature_transaction.data.local.RecurringDao)
+            : com.example.financeapp.feature_transaction.domain.repository.RecurringRepository =
+        com.example.financeapp.feature_transaction.data.repository.RecurringRepositoryImpl(dao)
+
+    // Use cases
+    @Provides @Singleton
+    fun provideRecurringUseCases(
+        repo: com.example.financeapp.feature_transaction.domain.repository.RecurringRepository
+    ) = com.example.financeapp.feature_transaction.domain.use_case.recurring.RecurringUseCases(
+        getRecurring = com.example.financeapp.feature_transaction.domain.use_case.recurring.GetRecurring(repo),
+        upsertRecurring = com.example.financeapp.feature_transaction.domain.use_case.recurring.UpsertRecurring(repo),
+        deleteRecurring = com.example.financeapp.feature_transaction.domain.use_case.recurring.DeleteRecurring(repo)
+    )
+
+    // Processor
+    @Provides @Singleton
+    fun provideRecurringProcessor(
+        recurringRepo: com.example.financeapp.feature_transaction.domain.repository.RecurringRepository,
+        addTransaction: com.example.financeapp.feature_transaction.domain.use_case.AddTransaction,
+        txRepo: com.example.financeapp.feature_transaction.domain.repository.TransactionRepository
+    ): com.example.financeapp.feature_transaction.domain.recurring.RecurringProcessor =
+        com.example.financeapp.feature_transaction.domain.recurring.RecurringProcessor(
+            recurringRepo, addTransaction, txRepo
+        )
 
 }

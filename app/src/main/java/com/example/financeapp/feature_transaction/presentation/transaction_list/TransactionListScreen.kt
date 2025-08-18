@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.rounded.Autorenew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -91,10 +92,6 @@ fun TransactionListScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // ⬇️ REMOVE this line:
-            // Text("Transactions", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
-
-            // optional small spacer so the header doesn't feel cramped
             Spacer(Modifier.height(4.dp))
 
             TotalsHeader(
@@ -135,9 +132,11 @@ fun TransactionListScreen(
 
             LazyColumn(Modifier.fillMaxSize()) {
                 items(uiState.filteredTransactions, key = { it.id ?: it.hashCode() }) { tx ->
+                    val nextAt = tx.recurringRuleId?.let { uiState.nextByRuleId[it] }    // ⬅️ add this
                     TransactionItem(
                         transaction = tx,
                         formattedDate = dateFormatter.format(Date(tx.date)),
+                        nextOccurrenceMillis = nextAt,                                     // ⬅️ pass it
                         onClick = { tx.id?.let(onEditClick) },
                         onDelete = {
                             viewModel.deleteTransaction(tx)
@@ -278,6 +277,7 @@ private fun TypeChips(
 private fun TransactionItem(
     transaction: Transaction,
     formattedDate: String,
+    nextOccurrenceMillis: Long? = null,    // ⬅️ NEW
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -289,14 +289,51 @@ private fun TransactionItem(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Row(
-            Modifier.padding(16.dp).fillMaxWidth(),
+            Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(Modifier.weight(1f)) {
-                Text(transaction.title, style = MaterialTheme.typography.titleMedium)
+
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text(transaction.title, style = MaterialTheme.typography.titleMedium)
+                    if (transaction.isRecurring) {
+                        Spacer(Modifier.width(8.dp))
+                        AssistChip(
+                            onClick = { /* no-op */ },
+                            label = { Text("Recurring") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Rounded.Autorenew,
+                                    contentDescription = null
+                                )
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                leadingIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        )
+                    }
+                }
+
                 Spacer(Modifier.height(4.dp))
                 Text("Category: ${transaction.category}", style = MaterialTheme.typography.bodySmall)
                 Text("Date: $formattedDate", style = MaterialTheme.typography.bodySmall)
+
+                // ⬇️ Show next occurrence (when available)
+                if (transaction.isRecurring && nextOccurrenceMillis != null) {
+                    val ctx = LocalContext.current
+                    val mediumDf = remember(ctx) { android.text.format.DateFormat.getMediumDateFormat(ctx) }
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "Next on ${mediumDf.format(Date(nextOccurrenceMillis))}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = (if (transaction.amount >= 0) "+" else "-") + run {
@@ -306,7 +343,9 @@ private fun TransactionItem(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
-            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "Delete") }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Filled.Delete, contentDescription = "Delete")
+            }
         }
     }
 }

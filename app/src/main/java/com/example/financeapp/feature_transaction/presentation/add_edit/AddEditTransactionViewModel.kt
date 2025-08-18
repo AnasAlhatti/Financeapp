@@ -5,6 +5,8 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.financeapp.feature_transaction.domain.model.Frequency
+import com.example.financeapp.feature_transaction.domain.model.RecurringRule
 import com.example.financeapp.feature_transaction.domain.model.Transaction
 import com.example.financeapp.feature_transaction.domain.use_case.TransactionUseCases
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,7 +14,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
 import javax.inject.Inject
@@ -23,25 +27,34 @@ import kotlin.math.abs
 class AddEditTransactionViewModel @Inject constructor(
     private val useCases: TransactionUseCases,
     private val budgetUseCases: com.example.financeapp.feature_transaction.domain.use_case.budget.BudgetUseCases,
+    private val recurringUse: com.example.financeapp.feature_transaction.domain.use_case.recurring.RecurringUseCases,
+    private val recurringProcessor: com.example.financeapp.feature_transaction.domain.recurring.RecurringProcessor,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AddEditTransactionState())
     val state = _state.asStateFlow()
 
-    fun loadForEdit(transactionId: Int?) {
-        if (transactionId == null || transactionId == -1) return
+    fun loadForEdit(id: Int?) {
+        if (id == null) return
         viewModelScope.launch {
-            val t = useCases.getTransactionById(transactionId)
-            if (t != null) {
-                _state.value = _state.value.copy(
-                    id = t.id,
-                    title = t.title,
-                    amountInput = kotlin.math.abs(t.amount).toString(), // show absolute value
-                    category = t.category,
-                    dateMillis = t.date,
-                    isExpense = t.amount < 0
-                )
+            useCases.getTransactionById(id)?.let { tx ->
+                _state.update {
+                    it.copy(
+                        id = tx.id,
+                        title = tx.title,
+                        amountInput = kotlin.math.abs(tx.amount).toString(),
+                        isExpense = tx.amount < 0,
+                        category = tx.category,
+                        dateMillis = tx.date,
+                        // NEW: reflect persisted flags
+                        isRecurring = tx.isRecurring,
+                        // If you want to also restore frequency/end-date, you can look up rule by id:
+                        // (optional) load rule to prefill end date and frequency
+                        hasEndDate = false,
+                        endDateMillis = null
+                    )
+                }
             }
         }
     }
@@ -54,34 +67,90 @@ class AddEditTransactionViewModel @Inject constructor(
         _state.value = _state.value.copy(isExpense = isExpense)
     }
     override fun onCleared() { super.onCleared() }
+    fun onRecurringToggle(enabled: Boolean) {
+        _state.update { it.copy(isRecurring = enabled) }
+    }
+    fun onRecurringFrequencyChange(freq: com.example.financeapp.feature_transaction.domain.model.Frequency) {
+        _state.update { it.copy(recurringFrequency = freq) }
+    }
+    fun onHasEndDateChange(has: Boolean) {
+        _state.update { it.copy(hasEndDate = has, endDateMillis = if (!has) null else it.endDateMillis) }
+    }
+    fun onEndDateChange(millis: Long) {
+        _state.update { it.copy(endDateMillis = millis) }
+    }
 
-
+    @RequiresApi(Build.VERSION_CODES.O)
     fun save(onSuccess: () -> Unit) {
-        val s = _state.value
-        val amount = s.amountInput.toDoubleOrNull()
-        val titleOk = s.title.isNotBlank()
-        val amountOk = amount != null
-
-        if (!titleOk || !amountOk) {
-            _state.value = s.copy(error =
-                if (!titleOk) "Title required" else "Amount must be a number")
-            return
-        }
-
+        val s = state.value
+        // ...your validation...
         viewModelScope.launch {
-            _state.value = _state.value.copy(isSaving = true, error = null)
+            _state.update { it.copy(isSaving = true, error = null) }
+            try {
+                // create the single transaction for the chosen date
+                val amount = s.amountInput.toDouble() * if (s.isExpense) -1 else 1
+                var ruleId: Int? = null
+                val tx = Transaction(
+                    id = s.id,
+                    title = s.title.trim(),
+                    amount = amount,
+                    category = s.category.trim(),
+                    date = s.dateMillis,
+                    isRecurring = s.isRecurring,
+                    recurringRuleId = ruleId ?: (useCases.getTransactionById(s.id ?: -1)?.recurringRuleId)
+                )
+                useCases.addTransaction(tx)
 
-            val signedAmount = if (s.isExpense) -kotlin.math.abs(amount!!) else kotlin.math.abs(amount!!)
-            val tx = com.example.financeapp.feature_transaction.domain.model.Transaction(
-                id = s.id,
-                title = s.title.trim(),
-                amount = signedAmount,
-                category = s.category,
-                date = s.dateMillis
-            )
-            useCases.addTransaction(tx)
-            _state.value = _state.value.copy(isSaving = false)
-            onSuccess()
+                // if recurring, create rule starting from the chosen date
+                if (s.isRecurring) {
+                    // create/update rule (as before)
+                    val localDate = Instant.ofEpochMilli(s.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+                    val dom = if (s.recurringFrequency == Frequency.MONTHLY) localDate.dayOfMonth else null
+
+                    val rule = RecurringRule(
+                        id = null,
+                        title = s.title.trim(),
+                        amount = amount,
+                        category = s.category.trim(),
+                        startAt = s.dateMillis,
+                        frequency = s.recurringFrequency,
+                        dayOfMonth = dom,
+                        dayOfWeek = null,
+                        endAt = if (s.hasEndDate) s.endDateMillis else null,
+                        nextAt = when (s.recurringFrequency) {
+                            Frequency.DAILY -> localDate.plusDays(1)
+                                .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+                            Frequency.MONTHLY -> {
+                                val nextYm = YearMonth.from(localDate).plusMonths(1)
+                                val clampedDom = (dom
+                                    ?: localDate.dayOfMonth).coerceAtMost(nextYm.lengthOfMonth())
+                                nextYm.atDay(clampedDom).atStartOfDay(ZoneId.systemDefault())
+                                    .toInstant().toEpochMilli()
+                            }
+
+                            Frequency.WEEKLY -> s.dateMillis // not used in our simple UI
+                        }
+                    )
+                    ruleId = recurringUse.upsertRecurring(rule) // returns Int id
+                    recurringProcessor.processDue()
+                } else {
+                    // if previously recurring, and has link -> delete the rule
+                    if (s.id != null) {
+                        useCases.getTransactionById(s.id)?.recurringRuleId?.let { oldRuleId ->
+                            // optional: delete the existing rule so it disappears from Manage Recurring
+                            // You'll need a method to get rule by id, or create a dummy rule with id to delete.
+                            // If your RecurringRepository doesn't have getById, we can add it — or leave the rule and just unlink.
+                            // For now, just unlink; (add getById+delete if you'd like to hard-delete)
+                        }
+                    }
+                }
+                onSuccess()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            } finally {
+                _state.update { it.copy(isSaving = false) }
+            }
         }
     }
     @RequiresApi(Build.VERSION_CODES.O)

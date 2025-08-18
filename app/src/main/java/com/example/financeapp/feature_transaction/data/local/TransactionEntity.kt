@@ -10,13 +10,23 @@ data class TransactionEntity(
     val title: String,
     val amount: Double,
     val category: String,
-    val date: Long
+    val date: Long,
+    val isRecurring: Boolean = false,
+    val recurringRuleId: Int? = null
 )
 
-fun TransactionEntity.toDomain(): Transaction {
-    return Transaction(id, title, amount, category, date)
-}
+fun TransactionEntity.toDomain() = Transaction(
+    id, title, amount, category, date,
+    isRecurring = isRecurring,
+    recurringRuleId = recurringRuleId
+)
 
-fun Transaction.toEntity(): TransactionEntity {
-    return TransactionEntity(id, title, amount, category, date)
-}
+fun Transaction.toEntity() = TransactionEntity(
+    id = id,
+    title = title,
+    amount = amount,
+    category = category,
+    date = date,
+    isRecurring = isRecurring,
+    recurringRuleId = recurringRuleId
+)

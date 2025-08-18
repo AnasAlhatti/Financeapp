@@ -5,5 +5,7 @@ data class Transaction(
     val title: String,
     val amount: Double,
     val category: String,
-    val date: Long // Store as timestamp
+    val date: Long,
+    val isRecurring: Boolean = false,
+    val recurringRuleId: Int? = null
 )

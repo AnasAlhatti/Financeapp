@@ -29,4 +29,7 @@ class TransactionRepositoryImpl(
     override suspend fun deleteTransaction(transaction: Transaction) {
         dao.deleteTransaction(transaction.toEntity())
     }
+
+    override suspend fun getBetween(start: Long, end: Long): List<Transaction> =
+        dao.getBetween(start, end).map { it.toDomain() }
 }

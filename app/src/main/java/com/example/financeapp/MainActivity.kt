@@ -20,13 +20,17 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.financeapp.feature_transaction.presentation.add_edit.AddEditTransactionScreen
 import com.example.financeapp.feature_transaction.presentation.budgets.BudgetsScreen
+import com.example.financeapp.feature_transaction.presentation.recurring.ManageRecurringScreen
 import com.example.financeapp.feature_transaction.presentation.reports.ReportsScreen
 import com.example.financeapp.feature_transaction.presentation.transaction_list.TransactionListScreen
 import com.example.financeapp.ui.theme.FinanceappTheme
 import dagger.hilt.android.AndroidEntryPoint
+import jakarta.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject
+    lateinit var recurringProcessor: com.example.financeapp.feature_transaction.domain.recurring.RecurringProcessor
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,7 +50,7 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("add_edit_transaction?transactionId=$id")
                                 },
                                 onOpenReports = { navController.navigate("reports") },
-                                onOpenBudgets = { navController.navigate("budgets") }   // ✅ new
+                                onOpenBudgets = { navController.navigate("budgets") }
                             )
                         }
                         composable("budgets") {
@@ -54,6 +58,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("reports") {
                             ReportsScreen(onBack = { navController.popBackStack() })
+                        }
+                        composable("recurring") {
+                            ManageRecurringScreen(onBack = { navController.popBackStack() })
                         }
                         composable(
                             route = "add_edit_transaction?transactionId={transactionId}",

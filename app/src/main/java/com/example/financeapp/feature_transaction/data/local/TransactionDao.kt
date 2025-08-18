@@ -17,4 +17,7 @@ interface TransactionDao {
 
     @Query("SELECT * FROM transactions WHERE id = :id LIMIT 1")
     suspend fun getTransactionById(id: Int): TransactionEntity?
+
+    @Query("SELECT * FROM transactions WHERE date >= :start AND date < :end")
+    suspend fun getBetween(start: Long, end: Long): List<TransactionEntity>
 }

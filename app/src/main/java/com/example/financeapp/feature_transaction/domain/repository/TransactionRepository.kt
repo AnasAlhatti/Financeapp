@@ -8,4 +8,5 @@ interface TransactionRepository {
     suspend fun getTransactionById(id: Int): Transaction?
     suspend fun insertTransaction(transaction: Transaction)
     suspend fun deleteTransaction(transaction: Transaction)
+    suspend fun getBetween(start: Long, end: Long): List<Transaction>
 }

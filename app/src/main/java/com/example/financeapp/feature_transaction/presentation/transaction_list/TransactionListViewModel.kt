@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.financeapp.feature_transaction.domain.model.RecurringRule
 import com.example.financeapp.feature_transaction.domain.model.Transaction
 import com.example.financeapp.feature_transaction.domain.use_case.TransactionUseCases
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,20 +29,22 @@ data class TransactionListUiState(
     val amountFilter: AmountFilter = AmountFilter.ALL,
     val totalIncome: Double = 0.0,
     val totalExpense: Double = 0.0,
-    val balance: Double = 0.0
+    val balance: Double = 0.0,
+    val nextByRuleId: Map<Int, Long> = emptyMap()
 )
 
 @RequiresApi(Build.VERSION_CODES.O)
 @HiltViewModel
 class TransactionListViewModel @Inject constructor(
-    private val useCases: TransactionUseCases
+    private val useCases: TransactionUseCases,
+    private val recurringRepository: com.example.financeapp.feature_transaction.domain.repository.RecurringRepository
 ) : ViewModel() {
 
     private val selectedCategory = MutableStateFlow<String?>(null)
     private val selectedDateRange = MutableStateFlow(DateRange.ALL)
     private val selectedMonth = MutableStateFlow<YearMonth?>(null)
     private val selectedType = MutableStateFlow(AmountFilter.ALL)
-
+    private val recurringOnly = MutableStateFlow(false)
     private val _uiState = MutableStateFlow(TransactionListUiState())
     val uiState: StateFlow<TransactionListUiState> = _uiState.asStateFlow()
 
@@ -55,27 +58,35 @@ class TransactionListViewModel @Inject constructor(
 
         combine(
             useCases.getTransactions(),
+            recurringRepository.getAll(),
             selectedCategory,
             selectedDateRange,
             selectedMonth,
             selectedType
-        ) { list, category, range, month, type ->
+        ) { arr: Array<Any?> ->
+            val list = arr[0] as List<Transaction>
+            val rules = arr[1] as List<RecurringRule>
+            val category = arr[2] as String?
+            val range = arr[3] as DateRange
+            val month = arr[4] as YearMonth?
+            val type = arr[5] as AmountFilter
 
+            val nextMap = rules.mapNotNull { r -> r.id?.let { it to r.nextAt } }.toMap()
+
+            val zone = ZoneId.systemDefault()
             val (startMillis, endMillis) = rangeMillisFor(range, month, zone)
 
-            // 1) Date window [start, end)
             var filtered = list.filter { tx ->
                 val t = tx.date
                 (startMillis == null || t >= startMillis) &&
                         (endMillis == null || t < endMillis)
             }
 
-            // 2) Category
             if (!category.isNullOrBlank()) {
-                filtered = filtered.filter { it.category == category }
+                filtered = if (category == "Recurring") filtered.filter { it.isRecurring }
+                else filtered.filter { it.category == category }
             }
 
-            // 3) Type (Income/Expense)
             filtered = when (type) {
                 AmountFilter.ALL -> filtered
                 AmountFilter.INCOME -> filtered.filter { it.amount > 0 }
@@ -83,25 +94,26 @@ class TransactionListViewModel @Inject constructor(
             }
 
             val income = filtered.filter { it.amount > 0 }.sumOf { it.amount }
-            val expense = filtered.filter { it.amount < 0 }.sumOf { abs(it.amount) }
+            val expense = filtered.filter { it.amount < 0 }.sumOf { kotlin.math.abs(it.amount) }
             val balance = income - expense
 
             TransactionListUiState(
                 allTransactions = list,
                 filteredTransactions = filtered.sortedByDescending { it.date },
-                categories = list.map { it.category }.distinct().sorted(),
+                categories = (list.map { it.category }.distinct().sorted() + "Recurring"),
                 selectedCategory = category,
                 dateRange = range,
                 selectedMonth = month,
                 amountFilter = type,
                 totalIncome = income,
                 totalExpense = expense,
-                balance = balance
+                balance = balance,
+                nextByRuleId = nextMap
             )
-        }.onEach { _uiState.value = it }
+        }
+            .onEach { _uiState.value = it }
             .launchIn(viewModelScope)
     }
-
     /** Computes [start, end) in epoch millis for the chosen range, in given zone. */
     @RequiresApi(Build.VERSION_CODES.O)
     private fun rangeMillisFor(
