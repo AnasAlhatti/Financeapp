@@ -7,7 +7,7 @@ import com.example.financeapp.feature_transaction.data.local.Migrations
 import com.example.financeapp.feature_transaction.data.local.TransactionDao
 import com.example.financeapp.feature_transaction.data.local.TransactionDatabase
 import com.example.financeapp.feature_transaction.data.repository.BudgetRepositoryImpl
-import com.example.financeapp.feature_transaction.data.repository.TransactionRepositoryImpl
+import com.example.financeapp.feature_transaction.domain.repository.TransactionRepositoryImpl
 import com.example.financeapp.feature_transaction.domain.repository.BudgetRepository
 import com.example.financeapp.feature_transaction.domain.repository.TransactionRepository
 import com.example.financeapp.feature_transaction.domain.use_case.transaction.AddTransaction

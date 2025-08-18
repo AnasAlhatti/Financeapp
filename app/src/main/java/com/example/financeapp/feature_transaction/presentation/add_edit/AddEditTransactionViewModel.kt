@@ -13,14 +13,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
 import javax.inject.Inject
-import kotlin.math.abs
 
 
 @HiltViewModel
@@ -47,10 +45,7 @@ class AddEditTransactionViewModel @Inject constructor(
                         isExpense = tx.amount < 0,
                         category = tx.category,
                         dateMillis = tx.date,
-                        // NEW: reflect persisted flags
                         isRecurring = tx.isRecurring,
-                        // If you want to also restore frequency/end-date, you can look up rule by id:
-                        // (optional) load rule to prefill end date and frequency
                         hasEndDate = false,
                         endDateMillis = null
                     )
@@ -70,7 +65,7 @@ class AddEditTransactionViewModel @Inject constructor(
     fun onRecurringToggle(enabled: Boolean) {
         _state.update { it.copy(isRecurring = enabled) }
     }
-    fun onRecurringFrequencyChange(freq: com.example.financeapp.feature_transaction.domain.model.Frequency) {
+    fun onRecurringFrequencyChange(freq: Frequency) {
         _state.update { it.copy(recurringFrequency = freq) }
     }
     fun onHasEndDateChange(has: Boolean) {
@@ -101,9 +96,7 @@ class AddEditTransactionViewModel @Inject constructor(
                 )
                 useCases.addTransaction(tx)
 
-                // if recurring, create rule starting from the chosen date
                 if (s.isRecurring) {
-                    // create/update rule (as before)
                     val localDate = Instant.ofEpochMilli(s.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate()
                     val dom = if (s.recurringFrequency == Frequency.MONTHLY) localDate.dayOfMonth else null
 
@@ -129,19 +122,14 @@ class AddEditTransactionViewModel @Inject constructor(
                                     .toInstant().toEpochMilli()
                             }
 
-                            Frequency.WEEKLY -> s.dateMillis // not used in our simple UI
+                            Frequency.WEEKLY -> s.dateMillis
                         }
                     )
-                    ruleId = recurringUse.upsertRecurring(rule) // returns Int id
+                    ruleId = recurringUse.upsertRecurring(rule)
                     recurringProcessor.processDue()
                 } else {
-                    // if previously recurring, and has link -> delete the rule
                     if (s.id != null) {
                         useCases.getTransactionById(s.id)?.recurringRuleId?.let { oldRuleId ->
-                            // optional: delete the existing rule so it disappears from Manage Recurring
-                            // You'll need a method to get rule by id, or create a dummy rule with id to delete.
-                            // If your RecurringRepository doesn't have getById, we can add it — or leave the rule and just unlink.
-                            // For now, just unlink; (add getById+delete if you'd like to hard-delete)
                         }
                     }
                 }
@@ -150,40 +138,6 @@ class AddEditTransactionViewModel @Inject constructor(
                 _state.update { it.copy(error = e.message) }
             } finally {
                 _state.update { it.copy(isSaving = false) }
-            }
-        }
-    }
-    @RequiresApi(Build.VERSION_CODES.O)
-    private fun checkBudgetThresholdsAfterSave(tx: com.example.financeapp.feature_transaction.domain.model.Transaction) {
-        // Only for expenses within this month
-        if (tx.amount >= 0) return
-        viewModelScope.launch {
-            val zone = ZoneId.systemDefault()
-            val ym = YearMonth.now()
-            val start = ym.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
-            val end = ym.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
-
-            val budgets = budgetUseCases.getBudgets().first()
-            val budget = budgets.firstOrNull { it.category == tx.category } ?: return@launch
-
-            val txs = useCases.getTransactions().first().filter { it.date in start until end && it.category == tx.category && it.amount < 0 }
-            val spentAfter = txs.sumOf { abs(it.amount) }
-            val spentBefore = spentAfter - abs(tx.amount)
-
-            val limit = budget.limitAmount
-            if (limit <= 0) return@launch
-
-            val beforePct = (spentBefore / limit) * 100.0
-            val afterPct  = (spentAfter  / limit) * 100.0
-
-            // fire only on crossing upward
-            val crossed100 = beforePct < 100 && afterPct >= 100
-            val crossed80  = beforePct < 80  && afterPct >= 80
-
-            if (crossed100) {
-                com.example.financeapp.feature_transaction.presentation.budgets.BudgetNotifier.notifyThreshold(appContext, tx.category, 100)
-            } else if (crossed80) {
-                com.example.financeapp.feature_transaction.presentation.budgets.BudgetNotifier.notifyThreshold(appContext, tx.category, 80)
             }
         }
     }

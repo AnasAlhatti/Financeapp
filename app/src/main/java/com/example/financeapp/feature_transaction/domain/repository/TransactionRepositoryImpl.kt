@@ -1,10 +1,9 @@
-package com.example.financeapp.feature_transaction.data.repository
+package com.example.financeapp.feature_transaction.domain.repository
 
 import com.example.financeapp.feature_transaction.data.local.TransactionDao
 import com.example.financeapp.feature_transaction.data.local.toDomain
 import com.example.financeapp.feature_transaction.data.local.toEntity
 import com.example.financeapp.feature_transaction.domain.model.Transaction
-import com.example.financeapp.feature_transaction.domain.repository.TransactionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
