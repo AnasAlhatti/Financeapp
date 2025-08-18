@@ -46,22 +46,49 @@ class MainActivity : ComponentActivity() {
                         composable("transaction_list") {
                             TransactionListScreen(
                                 onAddClick = { navController.navigate("add_edit_transaction") },
-                                onEditClick = { id ->
-                                    navController.navigate("add_edit_transaction?transactionId=$id")
-                                },
+                                onEditClick = { id -> navController.navigate("add_edit_transaction?transactionId=$id") },
                                 onOpenReports = { navController.navigate("reports") },
                                 onOpenBudgets = { navController.navigate("budgets") }
                             )
                         }
-                        composable("budgets") {
-                            BudgetsScreen(onBack = { navController.popBackStack() })
-                        }
+
                         composable("reports") {
-                            ReportsScreen(onBack = { navController.popBackStack() })
+                            ReportsScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenTransactions = {
+                                    // Go back to list if it's already in the back stack, otherwise navigate
+                                    val popped = navController.popBackStack(route = "transaction_list", inclusive = false)
+                                    if (!popped) navController.navigate("transaction_list") {
+                                        popUpTo("transaction_list") { inclusive = false }
+                                        launchSingleTop = true
+                                    }
+                                },
+                                onOpenBudgets = {
+                                    navController.navigate("budgets") {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            )
                         }
-                        composable("recurring") {
-                            ManageRecurringScreen(onBack = { navController.popBackStack() })
+
+                        composable("budgets") {
+                            BudgetsScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenTransactions = {
+                                    val popped = navController.popBackStack(route = "transaction_list", inclusive = false)
+                                    if (!popped) navController.navigate("transaction_list") {
+                                        popUpTo("transaction_list") { inclusive = false }
+                                        launchSingleTop = true
+                                    }
+                                },
+                                onOpenReports = {
+                                    navController.navigate("reports") {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            )
                         }
+
                         composable(
                             route = "add_edit_transaction?transactionId={transactionId}",
                             arguments = listOf(
@@ -78,6 +105,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+
                 }
             }
         }

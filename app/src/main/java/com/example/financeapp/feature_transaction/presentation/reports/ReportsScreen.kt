@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -25,6 +26,7 @@ import com.patrykandpatrick.vico.core.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.core.cartesian.data.columnSeries
+import kotlinx.coroutines.launch
 import java.time.YearMonth
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -32,128 +34,166 @@ import java.time.YearMonth
 @Composable
 fun ReportsScreen(
     onBack: () -> Unit,
+    onOpenTransactions: () -> Unit = {},
+    onOpenBudgets: () -> Unit = {},
     viewModel: ReportsViewModel = hiltViewModel()
 ) {
     val ui by viewModel.ui.collectAsState()
-
+    val budgetsVm: com.example.financeapp.feature_transaction.presentation.budgets.BudgetsSummaryViewModel =
+        hiltViewModel()
+    val warnings by budgetsVm.warnings.collectAsState()
     var showMonthPicker by remember { mutableStateOf(false) }
 
-    val budgetsVm: com.example.financeapp.feature_transaction.presentation.budgets.BudgetsSummaryViewModel = hiltViewModel()
-    val warnings by budgetsVm.warnings.collectAsState()
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Reports") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                }
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            com.example.financeapp.ui.common.AppDrawer(
+                onNavigateTransactions = {
+                    scope.launch { drawerState.close() }
+                    onOpenTransactions()
+                },
+                onNavigateReports = { scope.launch { drawerState.close() } },
+                onNavigateBudgets = {
+                    scope.launch { drawerState.close() }
+                    onOpenBudgets()
+                },
+                selectedRoute = com.example.financeapp.ui.common.DrawerRoute.Reports
             )
         }
-    ) { padding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Filter Bar (reusing compact bar)
-            FilterBar(
-                dateRange = ui.dateRange,
-                selectedMonth = ui.selectedMonth,
-                amountFilter = ui.amountFilter,
-                categories = emptyList(),                 // categories filter not needed in reports
-                selectedCategory = null,
-                onDateRangeSelected = viewModel::onDateRangeSelected,
-                onPickMonth = { showMonthPicker = true },
-                onTypeSelected = viewModel::onTypeSelected,
-                onCategorySelected = {},                  // no-op
-                onClearAll = {
-                    viewModel.onDateRangeSelected(DateRange.THIS_MONTH)
-                    viewModel.onTypeSelected(AmountFilter.ALL)
-                },
-                modifier = Modifier.padding(16.dp)
-            )
-
-            // Totals card
-            ElevatedCard(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .fillMaxWidth()
-            ) {
-                val title = when (ui.amountFilter) {
-                    AmountFilter.ALL -> "Net Total"
-                    AmountFilter.INCOME -> "Total Income"
-                    AmountFilter.EXPENSE -> "Total Expense"
-                }
-                Column(Modifier.padding(16.dp)) {
-                    Text(title, style = MaterialTheme.typography.labelMedium)
-                    Spacer(Modifier.height(4.dp))
-                    Text(ui.total.formatCurrency(), style = MaterialTheme.typography.titleLarge)
-                }
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Reports") },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                )
             }
-            if (warnings.isNotEmpty()) {
-                val nf = remember { java.text.NumberFormat.getCurrencyInstance() }
-                Spacer(Modifier.height(12.dp))
+        ) { padding ->
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // … your existing content unchanged …
+                FilterBar(
+                    dateRange = ui.dateRange,
+                    selectedMonth = ui.selectedMonth,
+                    amountFilter = ui.amountFilter,
+                    categories = emptyList(),
+                    selectedCategory = null,
+                    onDateRangeSelected = viewModel::onDateRangeSelected,
+                    onPickMonth = { showMonthPicker = true },
+                    onTypeSelected = viewModel::onTypeSelected,
+                    onCategorySelected = {},
+                    onClearAll = {
+                        viewModel.onDateRangeSelected(DateRange.THIS_MONTH)
+                        viewModel.onTypeSelected(AmountFilter.ALL)
+                    },
+                    modifier = Modifier.padding(16.dp)
+                )
+
+                // Totals card
                 ElevatedCard(
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
                         .fillMaxWidth()
                 ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Budgets at a glance", style = MaterialTheme.typography.titleSmall)
-
-                        warnings.take(3).forEach { w ->
-                            val ratio = w.ratio
-                            val level = com.example.financeapp.feature_transaction.presentation.budgets.levelForRatio(ratio)
-                            val barColor = com.example.financeapp.feature_transaction.presentation.budgets.colorForLevel(level)
-
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(w.category, color = barColor, style = MaterialTheme.typography.bodyMedium)
-                                LinearProgressIndicator(
-                                    progress = { ratio.toFloat().coerceAtMost(1f) },
-                                    color = barColor,
-                                    trackColor = barColor.copy(alpha = 0.15f)
-                                )
-                                Text(
-                                    text = "${nf.format(w.spent)} / ${nf.format(w.limit)}  •  ${(ratio * 100).toInt()}%",
-                                    color = barColor,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
-
-                        // Optional legend (kept as-is)
-                        Spacer(Modifier.height(8.dp))
-                        BudgetLegend()
+                    val title = when (ui.amountFilter) {
+                        AmountFilter.ALL -> "Net Total"
+                        AmountFilter.INCOME -> "Total Income"
+                        AmountFilter.EXPENSE -> "Total Expense"
+                    }
+                    Column(Modifier.padding(16.dp)) {
+                        Text(title, style = MaterialTheme.typography.labelMedium)
+                        Spacer(Modifier.height(4.dp))
+                        Text(ui.total.formatCurrency(), style = MaterialTheme.typography.titleLarge)
                     }
                 }
+                if (warnings.isNotEmpty()) {
+                    val nf = remember { java.text.NumberFormat.getCurrencyInstance() }
+                    Spacer(Modifier.height(12.dp))
+                    ElevatedCard(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Column(
+                            Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text("Budgets at a glance", style = MaterialTheme.typography.titleSmall)
+
+                            warnings.take(3).forEach { w ->
+                                val ratio = w.ratio
+                                val level =
+                                    com.example.financeapp.feature_transaction.presentation.budgets.levelForRatio(
+                                        ratio
+                                    )
+                                val barColor =
+                                    com.example.financeapp.feature_transaction.presentation.budgets.colorForLevel(
+                                        level
+                                    )
+
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        w.category,
+                                        color = barColor,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    LinearProgressIndicator(
+                                        progress = { ratio.toFloat().coerceAtMost(1f) },
+                                        color = barColor,
+                                        trackColor = barColor.copy(alpha = 0.15f)
+                                    )
+                                    Text(
+                                        text = "${nf.format(w.spent)} / ${nf.format(w.limit)}  •  ${(ratio * 100).toInt()}%",
+                                        color = barColor,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                            // Optional legend (kept as-is)
+                            Spacer(Modifier.height(8.dp))
+                            BudgetLegend()
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+
+                // Category totals bar
+                SectionTitle("By Category")
+                CategoryBarChart(ui)
+
+                Spacer(Modifier.height(16.dp))
+
+                // Daily trend bar
+                SectionTitle("Trend")
+                DailyBarChart(ui)
             }
-            Spacer(Modifier.height(16.dp))
-
-            // Category totals bar
-            SectionTitle("By Category")
-            CategoryBarChart(ui)
-
-            Spacer(Modifier.height(16.dp))
-
-            // Daily trend bar
-            SectionTitle("Trend")
-            DailyBarChart(ui)
         }
-    }
-
-    if (showMonthPicker) {
-        com.example.financeapp.feature_transaction.presentation.transaction_list.MonthPickerDialog(
-            initial = ui.selectedMonth ?: YearMonth.now(),
-            onDismiss = { showMonthPicker = false },
-            onConfirm = {
-                viewModel.onMonthPicked(it)
-                showMonthPicker = false
-            }
-        )
+        if (showMonthPicker) {
+            com.example.financeapp.feature_transaction.presentation.transaction_list.MonthPickerDialog(
+                initial = ui.selectedMonth ?: YearMonth.now(),
+                onDismiss = { showMonthPicker = false },
+                onConfirm = {
+                    viewModel.onMonthPicked(it)
+                    showMonthPicker = false
+                }
+            )
+        }
     }
 }
 

@@ -10,9 +10,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material.icons.outlined.ListAlt
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.rounded.Autorenew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,118 +46,121 @@ fun TransactionListScreen(
     viewModel: TransactionListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val dateFormatter = remember(LocalContext.current) {
-        DateFormat.getDateInstance(DateFormat.MEDIUM)
-    }
+    val dateFormatter = remember(LocalContext.current) { DateFormat.getDateInstance(DateFormat.MEDIUM) }
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.getDefault()) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     var showMonthPicker by remember { mutableStateOf(false) }
+
+    // Drawer state
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+
+    // Budget warnings
     val budgetsVm: com.example.financeapp.feature_transaction.presentation.budgets.BudgetsSummaryViewModel = hiltViewModel()
     val warnings by budgetsVm.warnings.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Transactions") },
-                actions = {
-                    IconButton(onClick = onOpenReports) {
-                        Icon(
-                            imageVector = Icons.Outlined.Insights,
-                            contentDescription = "Reports"
-                        )
-                    }
-                    var overflow by remember { mutableStateOf(false) }
-                    IconButton(onClick = { overflow = true }) {
-                        Icon(
-                            imageVector = Icons.Outlined.MoreVert,
-                            contentDescription = "More"
-                        )
-                    }
-                    DropdownMenu(expanded = overflow, onDismissRequest = { overflow = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Budgets") },
-                            onClick = { overflow = false; onOpenBudgets() }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Reports") },
-                            onClick = { overflow = false; onOpenReports() }
-                        )
-                    }
-                }
-            )
-        },
-        floatingActionButton = { FloatingActionButton(onClick = onAddClick) { Text("+") } },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            Spacer(Modifier.height(4.dp))
-
-            TotalsHeader(
-                income = currencyFormat.format(uiState.totalIncome),
-                expense = currencyFormat.format(uiState.totalExpense),
-                balance = currencyFormat.format(uiState.balance),
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-
-            BudgetWarningsBanner(
-                warnings = warnings,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 8.dp)
-            )
-
-            FilterBar(
-                dateRange = uiState.dateRange,
-                selectedMonth = uiState.selectedMonth,
-                amountFilter = uiState.amountFilter,
-                categories = uiState.categories,
-                selectedCategory = uiState.selectedCategory,
-                onDateRangeSelected = viewModel::onDateRangeSelected,
-                onPickMonth = { showMonthPicker = true },
-                onTypeSelected = viewModel::onTypeSelected,
-                onCategorySelected = viewModel::onCategorySelected,
-                onClearAll = {
-                    viewModel.onDateRangeSelected(DateRange.ALL)
-                    viewModel.onTypeSelected(AmountFilter.ALL)
-                    viewModel.onCategorySelected(null)
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            // ✅ Use the SAME AppDrawer as Reports/Budgets with the same narrow width
+            com.example.financeapp.ui.common.AppDrawer(
+                onNavigateTransactions = { scope.launch { drawerState.close() } },   // already here
+                onNavigateReports = {
+                    scope.launch { drawerState.close() }
+                    onOpenReports()
                 },
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 8.dp)
+                onNavigateBudgets = {
+                    scope.launch { drawerState.close() }
+                    onOpenBudgets()
+                },
+                selectedRoute = com.example.financeapp.ui.common.DrawerRoute.Transactions
             )
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Transactions") },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(
+                                imageVector = Icons.Filled.Menu,
+                                contentDescription = "Open navigation"
+                            )
+                        }
+                    }
+                )
+            },
+            floatingActionButton = { FloatingActionButton(onClick = onAddClick) { Text("+") } },
+            snackbarHost = { SnackbarHost(snackbarHostState) }
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                Spacer(Modifier.height(4.dp))
 
-            Spacer(Modifier.height(8.dp))
+                TotalsHeader(
+                    income = currencyFormat.format(uiState.totalIncome),
+                    expense = currencyFormat.format(uiState.totalExpense),
+                    balance = currencyFormat.format(uiState.balance),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
 
-            LazyColumn(Modifier.fillMaxSize()) {
-                items(uiState.filteredTransactions, key = { it.id ?: it.hashCode() }) { tx ->
-                    val nextAt = tx.recurringRuleId?.let { uiState.nextByRuleId[it] }    // ⬅️ add this
-                    TransactionItem(
-                        transaction = tx,
-                        formattedDate = dateFormatter.format(Date(tx.date)),
-                        nextOccurrenceMillis = nextAt,                                     // ⬅️ pass it
-                        onClick = { tx.id?.let(onEditClick) },
-                        onDelete = {
-                            viewModel.deleteTransaction(tx)
-                            scope.launch {
-                                val res = snackbarHostState.showSnackbar(
-                                    message = "Transaction deleted",
-                                    actionLabel = "Undo",
-                                    withDismissAction = true,
-                                    duration = SnackbarDuration.Short
-                                )
-                                if (res == SnackbarResult.ActionPerformed) {
-                                    viewModel.restoreLastDeleted()
+                BudgetWarningsBanner(
+                    warnings = warnings,
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 8.dp)
+                )
+
+                FilterBar(
+                    dateRange = uiState.dateRange,
+                    selectedMonth = uiState.selectedMonth,
+                    amountFilter = uiState.amountFilter,
+                    categories = uiState.categories,
+                    selectedCategory = uiState.selectedCategory,
+                    onDateRangeSelected = viewModel::onDateRangeSelected,
+                    onPickMonth = { showMonthPicker = true },
+                    onTypeSelected = viewModel::onTypeSelected,
+                    onCategorySelected = viewModel::onCategorySelected,
+                    onClearAll = {
+                        viewModel.onDateRangeSelected(DateRange.ALL)
+                        viewModel.onTypeSelected(AmountFilter.ALL)
+                        viewModel.onCategorySelected(null)
+                    },
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 8.dp)
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                LazyColumn(Modifier.fillMaxSize()) {
+                    items(uiState.filteredTransactions, key = { it.id ?: it.hashCode() }) { tx ->
+                        TransactionItem(
+                            transaction = tx,
+                            formattedDate = dateFormatter.format(Date(tx.date)),
+                            onClick = { tx.id?.let(onEditClick) },
+                            onDelete = {
+                                viewModel.deleteTransaction(tx)
+                                scope.launch {
+                                    val res = snackbarHostState.showSnackbar(
+                                        message = "Transaction deleted",
+                                        actionLabel = "Undo",
+                                        withDismissAction = true,
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    if (res == SnackbarResult.ActionPerformed) {
+                                        viewModel.restoreLastDeleted()
+                                    }
                                 }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -277,7 +285,7 @@ private fun TypeChips(
 private fun TransactionItem(
     transaction: Transaction,
     formattedDate: String,
-    nextOccurrenceMillis: Long? = null,    // ⬅️ NEW
+    nextOccurrenceMillis: Long? = null,
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -305,7 +313,7 @@ private fun TransactionItem(
                             label = { Text("Recurring") },
                             leadingIcon = {
                                 Icon(
-                                    imageVector = androidx.compose.material.icons.Icons.Rounded.Autorenew,
+                                    imageVector = Icons.Rounded.Autorenew,
                                     contentDescription = null
                                 )
                             },
