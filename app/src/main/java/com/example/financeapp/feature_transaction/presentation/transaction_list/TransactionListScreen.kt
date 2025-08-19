@@ -1,7 +1,11 @@
 package com.example.financeapp.feature_transaction.presentation.transaction_list
 
+import android.content.Context
 import android.icu.text.DateFormat
+import android.net.Uri
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -57,7 +61,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.financeapp.feature_transaction.domain.model.Transaction
 import com.example.financeapp.feature_transaction.presentation.budgets.BudgetWarningsBanner
 import kotlinx.coroutines.launch
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Date
@@ -88,7 +96,37 @@ fun TransactionListScreen(
     // Budget warnings
     val budgetsVm: com.example.financeapp.feature_transaction.presentation.budgets.BudgetsSummaryViewModel = hiltViewModel()
     val warnings by budgetsVm.warnings.collectAsState()
+    val context = LocalContext.current
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val all = uiState.allTransactions // or uiState.filteredTransactions if you want only current selection
+            val ok = writeTransactionsCsv(context, uri, all)
+            scope.launch {
+                snackbarHostState.showSnackbar(
+                    if (ok) "Exported ${all.size} transactions." else "Export failed."
+                )
+            }
+        }
+    }
 
+// OpenDocument for import
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val imported = readTransactionsCsv(context, uri)
+            if (imported.isNotEmpty()) {
+                viewModel.addTransactions(imported)
+                scope.launch {
+                    snackbarHostState.showSnackbar("Imported ${imported.size} transactions.")
+                }
+            } else {
+                scope.launch { snackbarHostState.showSnackbar("No valid rows to import.") }
+            }
+        }
+    }
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -103,7 +141,15 @@ fun TransactionListScreen(
                     scope.launch { drawerState.close() }
                     onOpenBudgets()
                 },
-                selectedRoute = com.example.financeapp.ui.common.DrawerRoute.Transactions
+                selectedRoute = com.example.financeapp.ui.common.DrawerRoute.Transactions,
+                onExportCsv = {
+                    scope.launch { drawerState.close() }
+                    exportLauncher.launch("transactions_${System.currentTimeMillis()}.csv")
+                },
+                onImportCsv = {
+                    scope.launch { drawerState.close() }
+                    importLauncher.launch(arrayOf("text/*", "text/csv", "application/csv"))
+                }
             )
         }
     ) {
@@ -234,81 +280,6 @@ private fun SummaryCard(title: String, value: String, modifier: Modifier = Modif
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DateRangeChips(
-    selected: DateRange,
-    selectedMonth: YearMonth?,
-    onSelect: (DateRange) -> Unit,
-    onPickMonth: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val ymFormatter = remember { DateTimeFormatter.ofPattern("MMM uuuu") }
-    Row(
-        modifier = modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        FilterChip(selected = selected == DateRange.ALL, onClick = { onSelect(DateRange.ALL) }, label = { Text("All") })
-        FilterChip(selected = selected == DateRange.THIS_WEEK, onClick = { onSelect(DateRange.THIS_WEEK) }, label = { Text("This Week") })
-        FilterChip(selected = selected == DateRange.THIS_MONTH, onClick = { onSelect(DateRange.THIS_MONTH) }, label = { Text("This Month") })
-        FilterChip(selected = selected == DateRange.LAST_30D, onClick = { onSelect(DateRange.LAST_30D) }, label = { Text("Last 30d") })
-        FilterChip(
-            selected = selected == DateRange.MONTH,
-            onClick = onPickMonth,
-            label = {
-                Text(if (selected == DateRange.MONTH && selectedMonth != null) selectedMonth.format(ymFormatter) else "Pick Month")
-            }
-        )
-    }
-}
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun CategoryChips(
-    categories: List<String>,
-    selected: String?,
-    onSelect: (String?) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // "All" chip
-        FilterChip(
-            selected = selected == null,
-            onClick = { onSelect(null) },
-            label = { Text("All") }
-        )
-
-        categories.forEach { category ->
-            FilterChip(
-                selected = selected == category,
-                onClick = { onSelect(category) },
-                label = { Text(category) }
-            )
-        }
-    }
-}
-
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TypeChips(
-    selected: AmountFilter,
-    onSelect: (AmountFilter) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        FilterChip(selected = selected == AmountFilter.ALL, onClick = { onSelect(AmountFilter.ALL) }, label = { Text("All Types") })
-        FilterChip(selected = selected == AmountFilter.INCOME, onClick = { onSelect(AmountFilter.INCOME) }, label = { Text("Income") })
-        FilterChip(selected = selected == AmountFilter.EXPENSE, onClick = { onSelect(AmountFilter.EXPENSE) }, label = { Text("Expense") })
-    }
-}
-
 @Composable
 private fun TransactionItem(
     transaction: Transaction,
@@ -355,13 +326,17 @@ private fun TransactionItem(
                 }
 
                 Spacer(Modifier.height(4.dp))
-                Text("Category: ${transaction.category}", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "Category: ${transaction.category}",
+                    style = MaterialTheme.typography.bodySmall
+                )
                 Text("Date: $formattedDate", style = MaterialTheme.typography.bodySmall)
 
                 // ⬇️ Show next occurrence (when available)
                 if (transaction.isRecurring && nextOccurrenceMillis != null) {
                     val ctx = LocalContext.current
-                    val mediumDf = remember(ctx) { android.text.format.DateFormat.getMediumDateFormat(ctx) }
+                    val mediumDf =
+                        remember(ctx) { android.text.format.DateFormat.getMediumDateFormat(ctx) }
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = "Next on ${mediumDf.format(Date(nextOccurrenceMillis))}",
@@ -384,4 +359,132 @@ private fun TransactionItem(
             }
         }
     }
+}
+
+private fun writeTransactionsCsv(
+    context: Context,
+    uri: Uri,
+    items: List<Transaction>
+): Boolean {
+    return try {
+        val dateFormat = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
+        context.contentResolver.openOutputStream(uri)?.use { os ->
+            OutputStreamWriter(os, Charsets.UTF_8).use { writer ->
+                // header
+                writer.appendLine("Title,Category,Date,Amount,Recurring")
+                items.forEach { tx ->
+                    val dateStr = dateFormat.format(Date(tx.date))
+                    writer.appendLine(
+                        listOf(
+                            tx.title.csvEsc(),
+                            tx.category.csvEsc(),
+                            dateStr,  // ✅ formatted date
+                            tx.amount.toString(),
+                            tx.isRecurring.toString()
+                        ).joinToString(",")
+                    )
+                }
+            }
+        }
+        true
+    } catch (t: Throwable) {
+        t.printStackTrace()
+        false
+    }
+}
+
+/** Read CSV with the same columns we write above. */
+private fun readTransactionsCsv(
+    context: Context,
+    uri: Uri
+): List<com.example.financeapp.feature_transaction.domain.model.Transaction> {
+    val result = mutableListOf<com.example.financeapp.feature_transaction.domain.model.Transaction>()
+    context.contentResolver.openInputStream(uri)?.use { input ->
+        BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { br ->
+            var first = true
+            br.lineSequence().forEach { rawLine ->
+                val line = rawLine.trim()
+                if (line.isEmpty()) return@forEach
+                // skip header if present
+                if (first && line.lowercase(Locale.getDefault()).startsWith("title,category,date,amount,recurring")) {
+                    first = false
+                    return@forEach
+                }
+                first = false
+
+                val cols = parseCsvLine(line)
+                if (cols.size < 5) return@forEach
+
+                val title = cols[0].trim()
+                val category = cols[1].trim()
+                val dateMillis = parseDateFlexible(cols[2]) ?: return@forEach
+                val amount = cols[3].toDoubleOrNull() ?: return@forEach
+                val recurring = cols[4].toBooleanStrictOrNull() ?: cols[4].equals("true", ignoreCase = true)
+
+                result += com.example.financeapp.feature_transaction.domain.model.Transaction(
+                    id = null,
+                    title = title,
+                    amount = amount,
+                    category = category,
+                    date = dateMillis,
+                    isRecurring = recurring
+                )
+            }
+        }
+    }
+    return result
+}
+
+/** Robust CSV line parser supporting quotes and commas. */
+private fun parseCsvLine(line: String): List<String> {
+    val out = mutableListOf<String>()
+    val cur = StringBuilder()
+    var inQuotes = false
+    var i = 0
+    while (i < line.length) {
+        val c = line[i]
+        when {
+            c == '"' -> {
+                if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
+                    // Escaped quote
+                    cur.append('"')
+                    i++
+                } else {
+                    inQuotes = !inQuotes
+                }
+            }
+            c == ',' && !inQuotes -> {
+                out += cur.toString()
+                cur.setLength(0)
+            }
+            else -> cur.append(c)
+        }
+        i++
+    }
+    out += cur.toString()
+    return out
+}
+
+/** Accept dd/MM/yyyy, yyyy-MM-dd, MM/dd/yyyy, or millis. */
+private fun parseDateFlexible(input: String): Long? {
+    val s = input.trim()
+    // 1) millis?
+    s.toLongOrNull()?.let { return it }
+
+    // 2) try supported patterns
+    val patterns = listOf("dd/MM/yyyy", "yyyy-MM-dd", "MM/dd/yyyy")
+    for (p in patterns) {
+        try {
+            val df = SimpleDateFormat(p, Locale.getDefault())
+            df.isLenient = false
+            val d = df.parse(s)
+            if (d != null) return d.time
+        } catch (_: Exception) { /* try next */ }
+    }
+    return null
+}
+fun String.csvEsc(): String {
+    val mustQuote = contains(',') || contains('"') || contains('\n') || contains('\r')
+    val cleaned = replace("\"", "\"\"")
+    return if (mustQuote) "\"$cleaned\"" else cleaned
 }

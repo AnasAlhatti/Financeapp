@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.financeapp.feature_transaction.domain.model.RecurringRule
 import com.example.financeapp.feature_transaction.domain.model.Transaction
+import com.example.financeapp.feature_transaction.domain.repository.RecurringRepository
 import com.example.financeapp.feature_transaction.domain.use_case.transaction.TransactionUseCases
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -36,14 +37,13 @@ data class TransactionListUiState(
 @HiltViewModel
 class TransactionListViewModel @Inject constructor(
     private val useCases: TransactionUseCases,
-    private val recurringRepository: com.example.financeapp.feature_transaction.domain.repository.RecurringRepository
+    private val recurringRepository: RecurringRepository
 ) : ViewModel() {
 
     private val selectedCategory = MutableStateFlow<String?>(null)
     private val selectedDateRange = MutableStateFlow(DateRange.ALL)
     private val selectedMonth = MutableStateFlow<YearMonth?>(null)
     private val selectedType = MutableStateFlow(AmountFilter.ALL)
-    private val recurringOnly = MutableStateFlow(false)
     private val _uiState = MutableStateFlow(TransactionListUiState())
     val uiState: StateFlow<TransactionListUiState> = _uiState.asStateFlow()
 
@@ -178,6 +178,11 @@ class TransactionListViewModel @Inject constructor(
                 useCases.addTransaction(tx)
                 recentlyDeleted = null
             }
+        }
+    }
+    fun addTransactions(items: List<Transaction>) {
+        viewModelScope.launch {
+            items.forEach { useCases.addTransaction(it) }
         }
     }
 }

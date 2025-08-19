@@ -6,14 +6,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.ListAlt
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationDrawerItemDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,11 +20,13 @@ fun AppDrawer(
     onNavigateTransactions: () -> Unit,
     onNavigateReports: () -> Unit,
     onNavigateBudgets: () -> Unit,
-    selectedRoute: DrawerRoute
+    selectedRoute: DrawerRoute,
+    // ⬇️ Optional CSV actions (shown only when non-null; we’ll pass them from TransactionListScreen)
+    onExportCsv: (() -> Unit)? = null,
+    onImportCsv: (() -> Unit)? = null,
 ) {
     ModalDrawerSheet(
-        modifier = Modifier
-            .width(280.dp)     // <- narrower drawer (Material suggests ~280dp)
+        modifier = Modifier.width(280.dp) // narrow drawer
     ) {
         Spacer(Modifier.height(12.dp))
         Text(
@@ -59,8 +58,39 @@ fun AppDrawer(
             onClick = onNavigateBudgets,
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
         )
+
+        // Optional “Data” section for CSV when available
+        if (onExportCsv != null || onImportCsv != null) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Data",
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+
+            if (onExportCsv != null) {
+                NavigationDrawerItem(
+                    label = { Text("Export CSV") },
+                    icon = { Icon(Icons.Outlined.FileDownload, contentDescription = null) },
+                    selected = false,
+                    onClick = onExportCsv,
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+            }
+
+            if (onImportCsv != null) {
+                NavigationDrawerItem(
+                    label = { Text("Import CSV") },
+                    icon = { Icon(Icons.Outlined.FileUpload, contentDescription = null) },
+                    selected = false,
+                    onClick = onImportCsv,
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+            }
+        }
+
         Spacer(Modifier.height(8.dp))
     }
 }
 
-enum class DrawerRoute { Transactions, Reports, Budgets}
+enum class DrawerRoute { Transactions, Reports, Budgets }
