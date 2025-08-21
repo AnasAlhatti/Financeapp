@@ -17,10 +17,10 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun BudgetWarningsBanner(
     warnings: List<BudgetWarning>,
+    formatter: java.text.NumberFormat,      // <-- add this
     modifier: Modifier = Modifier
 ) {
     if (warnings.isEmpty()) return
-    val nf = remember { java.text.NumberFormat.getCurrencyInstance() }
 
     ElevatedCard(modifier = modifier) {
         Column(Modifier.padding(12.dp)) {
@@ -40,7 +40,7 @@ fun BudgetWarningsBanner(
                         onClick = {},
                         label = {
                             Text(
-                                "${w.category}: $pctText (${nf.format(w.spent)}/${nf.format(w.limit)})",
+                                "${w.category}: $pctText (${formatter.format(w.spent)}/${formatter.format(w.limit)})",
                                 fontWeight = if (level == BudgetLevel.OVER) FontWeight.SemiBold else FontWeight.Normal
                             )
                         },

@@ -1,5 +1,10 @@
 package com.example.financeapp.feature_transaction.presentation.budgets
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,9 +17,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.financeapp.ui.common.AppDrawer
+import com.example.financeapp.ui.common.DrawerRoute
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 
@@ -24,10 +33,14 @@ fun BudgetsScreen(
     onBack: () -> Unit,
     onOpenTransactions: () -> Unit = {},
     onOpenReports: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onOpenScanReceipt: () -> Unit = {},
     viewModel: BudgetsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val nf = remember { NumberFormat.getCurrencyInstance() }
+    val currencyVm: com.example.financeapp.feature_settings.CurrencyViewModel = hiltViewModel()
+    val currencyCode by currencyVm.currencyCode.collectAsState()
+    val nf = com.example.financeapp.feature_settings.rememberCurrencyFormatter(currencyCode)
     val snackbar = remember { SnackbarHostState() }
     var showDialog by remember { mutableStateOf(false) }
     var editId by remember { mutableStateOf<Int?>(null) }
@@ -36,11 +49,28 @@ fun BudgetsScreen(
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    @Composable
+    fun RequestPostNotificationsPermissionOnce() {
+        if (Build.VERSION.SDK_INT < 33) return
 
+        val ctx = LocalContext.current
+        val launcher = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { /* granted/denied result ignored here */ }
+
+        // Request only if not granted
+        LaunchedEffect(Unit) {
+            val granted = ContextCompat.checkSelfPermission(
+                ctx, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            com.example.financeapp.ui.common.AppDrawer(
+            RequestPostNotificationsPermissionOnce()
+            AppDrawer(
                 onNavigateTransactions = {
                     scope.launch { drawerState.close() }
                     onOpenTransactions()
@@ -49,8 +79,18 @@ fun BudgetsScreen(
                     scope.launch { drawerState.close() }
                     onOpenReports()
                 },
-                onNavigateBudgets = { scope.launch { drawerState.close() } },
-                selectedRoute = com.example.financeapp.ui.common.DrawerRoute.Budgets
+                onNavigateBudgets = {
+                    scope.launch { drawerState.close() }
+                                    },
+                onNavigateSettings = {
+                    scope.launch { drawerState.close() }
+                    onOpenSettings()                // <-- use the new param
+                },
+                onNavigateScanReceipt = {
+                    scope.launch { drawerState.close() }
+                    onOpenScanReceipt()
+                },
+                selectedRoute = DrawerRoute.Budgets
             )
         }
     ) {

@@ -58,8 +58,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.financeapp.feature_settings.CurrencyViewModel
+import com.example.financeapp.feature_settings.rememberCurrencyFormatter
 import com.example.financeapp.feature_transaction.domain.model.Transaction
 import com.example.financeapp.feature_transaction.presentation.budgets.BudgetWarningsBanner
+import com.example.financeapp.ui.common.AppDrawer
+import com.example.financeapp.ui.common.DrawerRoute
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -79,11 +83,15 @@ fun TransactionListScreen(
     onEditClick: (Int) -> Unit,
     onOpenReports: () -> Unit,
     onOpenBudgets: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenScanReceipt: () -> Unit,
     viewModel: TransactionListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val dateFormatter = remember(LocalContext.current) { DateFormat.getDateInstance(DateFormat.MEDIUM) }
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.getDefault()) }
+    val currencyVm: CurrencyViewModel = hiltViewModel()
+    val currencyCode by currencyVm.currencyCode.collectAsState()
+    val currencyFormat = rememberCurrencyFormatter(currencyCode)
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -130,8 +138,7 @@ fun TransactionListScreen(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            // ✅ Use the SAME AppDrawer as Reports/Budgets with the same narrow width
-            com.example.financeapp.ui.common.AppDrawer(
+            AppDrawer(
                 onNavigateTransactions = { scope.launch { drawerState.close() } },   // already here
                 onNavigateReports = {
                     scope.launch { drawerState.close() }
@@ -141,7 +148,11 @@ fun TransactionListScreen(
                     scope.launch { drawerState.close() }
                     onOpenBudgets()
                 },
-                selectedRoute = com.example.financeapp.ui.common.DrawerRoute.Transactions,
+                onNavigateSettings = {
+                    scope.launch { drawerState.close() }
+                    onOpenSettings()
+                },
+                selectedRoute = DrawerRoute.Transactions,
                 onExportCsv = {
                     scope.launch { drawerState.close() }
                     exportLauncher.launch("transactions_${System.currentTimeMillis()}.csv")
@@ -149,6 +160,10 @@ fun TransactionListScreen(
                 onImportCsv = {
                     scope.launch { drawerState.close() }
                     importLauncher.launch(arrayOf("text/*", "text/csv", "application/csv"))
+                },
+                onNavigateScanReceipt = {
+                    scope.launch { drawerState.close() }
+                onOpenScanReceipt()
                 }
             )
         }
@@ -186,6 +201,7 @@ fun TransactionListScreen(
 
                 BudgetWarningsBanner(
                     warnings = warnings,
+                    formatter = currencyFormat,
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
                         .padding(top = 8.dp)
@@ -288,6 +304,9 @@ private fun TransactionItem(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val currencyVm: CurrencyViewModel = hiltViewModel()
+    val currencyCode by currencyVm.currencyCode.collectAsState()
+    val currencyFormat = rememberCurrencyFormatter(currencyCode)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -347,10 +366,8 @@ private fun TransactionItem(
 
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = (if (transaction.amount >= 0) "+" else "-") + run {
-                        val fmt = NumberFormat.getCurrencyInstance()
-                        fmt.format(kotlin.math.abs(transaction.amount))
-                    },
+                    text = (if (transaction.amount >= 0) "+" else "-") +
+                            currencyFormat.format(kotlin.math.abs(transaction.amount)),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }

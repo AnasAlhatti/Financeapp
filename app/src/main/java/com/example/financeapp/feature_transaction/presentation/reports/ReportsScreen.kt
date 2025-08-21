@@ -13,9 +13,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.financeapp.feature_transaction.presentation.budgets.BudgetsSummaryViewModel
 import com.example.financeapp.feature_transaction.presentation.transaction_list.AmountFilter
 import com.example.financeapp.feature_transaction.presentation.transaction_list.DateRange
 import com.example.financeapp.feature_transaction.presentation.transaction_list.FilterBar
+import com.example.financeapp.ui.common.DrawerRoute
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottom
 import com.patrykandpatrick.vico.compose.cartesian.axis.rememberStart
@@ -36,14 +38,17 @@ fun ReportsScreen(
     onBack: () -> Unit,
     onOpenTransactions: () -> Unit = {},
     onOpenBudgets: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onOpenScanReceipt: () -> Unit = {},
     viewModel: ReportsViewModel = hiltViewModel()
 ) {
     val ui by viewModel.ui.collectAsState()
-    val budgetsVm: com.example.financeapp.feature_transaction.presentation.budgets.BudgetsSummaryViewModel =
-        hiltViewModel()
+    val budgetsVm: BudgetsSummaryViewModel = hiltViewModel()
     val warnings by budgetsVm.warnings.collectAsState()
     var showMonthPicker by remember { mutableStateOf(false) }
-
+    val currencyVm: com.example.financeapp.feature_settings.CurrencyViewModel = hiltViewModel()
+    val code by currencyVm.currencyCode.collectAsState()
+    val nf = com.example.financeapp.feature_settings.rememberCurrencyFormatter(code)
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -55,12 +60,22 @@ fun ReportsScreen(
                     scope.launch { drawerState.close() }
                     onOpenTransactions()
                 },
-                onNavigateReports = { scope.launch { drawerState.close() } },
+                onNavigateReports = {
+                    scope.launch { drawerState.close() }
+                },
                 onNavigateBudgets = {
                     scope.launch { drawerState.close() }
                     onOpenBudgets()
                 },
-                selectedRoute = com.example.financeapp.ui.common.DrawerRoute.Reports
+                onNavigateSettings = {
+                    scope.launch { drawerState.close() }
+                    onOpenSettings()                // <-- use the new param
+                },
+                onNavigateScanReceipt = {
+                    scope.launch { drawerState.close() }
+                    onOpenScanReceipt()
+                },
+                selectedRoute = DrawerRoute.Reports
             )
         }
     ) {
@@ -119,7 +134,7 @@ fun ReportsScreen(
                     Column(Modifier.padding(16.dp)) {
                         Text(title, style = MaterialTheme.typography.labelMedium)
                         Spacer(Modifier.height(4.dp))
-                        Text(ui.total.formatCurrency(), style = MaterialTheme.typography.titleLarge)
+                        Text(nf.format(ui.total), style = MaterialTheme.typography.titleLarge)   // <-- here
                     }
                 }
                 if (warnings.isNotEmpty()) {
@@ -337,9 +352,4 @@ private fun EmptyChartPlaceholder(message: String) {
             )
         }
     }
-}
-
-private fun Double.formatCurrency(): String {
-    val nf = java.text.NumberFormat.getCurrencyInstance()
-    return nf.format(this)
 }

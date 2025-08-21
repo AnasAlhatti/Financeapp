@@ -10,6 +10,8 @@ import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.ListAlt
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -20,8 +22,9 @@ fun AppDrawer(
     onNavigateTransactions: () -> Unit,
     onNavigateReports: () -> Unit,
     onNavigateBudgets: () -> Unit,
+    onNavigateSettings: () -> Unit,
+    onNavigateScanReceipt: () -> Unit,
     selectedRoute: DrawerRoute,
-    // ⬇️ Optional CSV actions (shown only when non-null; we’ll pass them from TransactionListScreen)
     onExportCsv: (() -> Unit)? = null,
     onImportCsv: (() -> Unit)? = null,
 ) {
@@ -59,6 +62,22 @@ fun AppDrawer(
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
         )
 
+        NavigationDrawerItem(
+            label = { Text("Settings") },
+            icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+            selected = selectedRoute == DrawerRoute.Settings,
+            onClick = onNavigateSettings,
+            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+        )
+
+        NavigationDrawerItem(
+            label = { Text("Scan receipt") },
+            icon  = { Icon(Icons.Outlined.PhotoCamera, contentDescription = null) },
+            selected = false,
+            onClick = onNavigateScanReceipt,
+            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+        )
+
         // Optional “Data” section for CSV when available
         if (onExportCsv != null || onImportCsv != null) {
             Spacer(Modifier.height(12.dp))
@@ -93,4 +112,4 @@ fun AppDrawer(
     }
 }
 
-enum class DrawerRoute { Transactions, Reports, Budgets }
+enum class DrawerRoute { Transactions, Reports, Budgets, Settings}

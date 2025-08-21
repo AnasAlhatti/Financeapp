@@ -3,11 +3,14 @@ package com.example.financeapp.feature_transaction.presentation.add_edit
 import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.financeapp.feature_transaction.domain.model.Frequency
 import com.example.financeapp.feature_transaction.domain.model.RecurringRule
 import com.example.financeapp.feature_transaction.domain.model.Transaction
+import com.example.financeapp.feature_transaction.domain.recurring.RecurringProcessor
+import com.example.financeapp.feature_transaction.domain.use_case.recurring.RecurringUseCases
 import com.example.financeapp.feature_transaction.domain.use_case.transaction.TransactionUseCases
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -24,35 +27,60 @@ import javax.inject.Inject
 @HiltViewModel
 class AddEditTransactionViewModel @Inject constructor(
     private val useCases: TransactionUseCases,
-    private val budgetUseCases: com.example.financeapp.feature_transaction.domain.use_case.budget.BudgetUseCases,
-    private val recurringUse: com.example.financeapp.feature_transaction.domain.use_case.recurring.RecurringUseCases,
-    private val recurringProcessor: com.example.financeapp.feature_transaction.domain.recurring.RecurringProcessor,
+    private val recurringUse: RecurringUseCases,
+    private val recurringProcessor: RecurringProcessor,
+    private val savedStateHandle: SavedStateHandle,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AddEditTransactionState())
     val state = _state.asStateFlow()
 
+    private var loadedOnce = false
+
     fun loadForEdit(id: Int?) {
-        if (id == null) return
+        if (loadedOnce) return
+        loadedOnce = true
+
         viewModelScope.launch {
-            useCases.getTransactionById(id)?.let { tx ->
-                _state.update {
-                    it.copy(
-                        id = tx.id,
-                        title = tx.title,
-                        amountInput = kotlin.math.abs(tx.amount).toString(),
-                        isExpense = tx.amount < 0,
-                        category = tx.category,
-                        dateMillis = tx.date,
-                        isRecurring = tx.isRecurring,
-                        hasEndDate = false,
-                        endDateMillis = null
+            if (id != null && id != -1) {
+                // Editing an existing transaction
+                val tx = useCases.getTransactionById(id)
+                tx?.let {
+                    _state.update { s ->
+                        s.copy(
+                            id = it.id,
+                            title = it.title,
+                            amountInput = kotlin.math.abs(it.amount).toString(),
+                            isExpense = it.amount < 0,
+                            category = it.category,
+                            dateMillis = it.date,
+                            isRecurring = it.isRecurring,
+                            hasEndDate = s.hasEndDate,
+                            endDateMillis = s.endDateMillis
+                        )
+                    }
+                }
+            } else {
+                // New transaction: apply prefill if present (e.g., from Scan Receipt)
+                val prefillTitle = savedStateHandle.get<String>("prefillTitle").orEmpty()
+                val prefillAmount = savedStateHandle.get<String>("prefillAmount").orEmpty()
+                val prefillDate = savedStateHandle.get<Long>("prefillDate") ?: -1L
+                val prefillCategory = savedStateHandle.get<String>("prefillCategory").orEmpty()
+
+                _state.update { s ->
+                    s.copy(
+                        title = if (prefillTitle.isNotBlank()) prefillTitle else s.title,
+                        amountInput = if (prefillAmount.isNotBlank()) prefillAmount else s.amountInput,
+                        category = if (prefillCategory.isNotBlank()) prefillCategory else s.category,
+                        dateMillis = if (prefillDate > 0) prefillDate else s.dateMillis
+                        // leave recurring fields as-is for new entries
                     )
                 }
             }
         }
     }
+
 
     fun onTitleChange(v: String) { _state.value = _state.value.copy(title = v, error = null) }
     fun onAmountChange(v: String) { _state.value = _state.value.copy(amountInput = v, error = null) }
@@ -61,7 +89,7 @@ class AddEditTransactionViewModel @Inject constructor(
     fun onTypeChange(isExpense: Boolean) {
         _state.value = _state.value.copy(isExpense = isExpense)
     }
-    override fun onCleared() { super.onCleared() }
+
     fun onRecurringToggle(enabled: Boolean) {
         _state.update { it.copy(isRecurring = enabled) }
     }
