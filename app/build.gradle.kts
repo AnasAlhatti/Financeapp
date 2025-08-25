@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    id("com.google.gms.google-services")
     id("androidx.room") // This line is correct
 }
 room {
@@ -117,4 +118,11 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
     implementation("androidx.exifinterface:exifinterface:1.4.1")
+
+// Firebase
+    implementation(platform("com.google.firebase:firebase-bom:34.1.0")) // Good, keep using the BOM
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.android.gms:play-services-auth:21.4.0") // For Google Sign-In
+    implementation("com.google.firebase:firebase-firestore") // Use this instead of -ktx
 }

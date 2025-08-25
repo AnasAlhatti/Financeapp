@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
@@ -13,6 +15,7 @@ import androidx.compose.material.icons.outlined.ListAlt
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -24,9 +27,11 @@ fun AppDrawer(
     onNavigateBudgets: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateScanReceipt: () -> Unit,
-    selectedRoute: DrawerRoute,
+    onLogout: (() -> Unit)? = null,
+    currentUserEmail: String? = null,
     onExportCsv: (() -> Unit)? = null,
     onImportCsv: (() -> Unit)? = null,
+    selectedRoute: DrawerRoute,
 ) {
     ModalDrawerSheet(
         modifier = Modifier.width(280.dp) // narrow drawer
@@ -37,6 +42,10 @@ fun AppDrawer(
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
+        currentUserEmail?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp))
+        }
 
         NavigationDrawerItem(
             label = { Text("Transactions") },
@@ -107,7 +116,20 @@ fun AppDrawer(
                 )
             }
         }
-
+        if (onLogout != null) {
+            HorizontalDivider(
+                Modifier.padding(vertical = 8.dp),
+                DividerDefaults.Thickness,
+                DividerDefaults.color
+            )
+            NavigationDrawerItem(
+                label = { Text("Logout") },
+                icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null) },
+                selected = false,
+                onClick = onLogout,
+                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            )
+        }
         Spacer(Modifier.height(8.dp))
     }
 }

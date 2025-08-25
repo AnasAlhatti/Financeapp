@@ -1,3 +1,4 @@
+// feature_transaction/data/local/Migrations.kt
 package com.example.financeapp.feature_transaction.data.local
 
 import androidx.room.migration.Migration
@@ -25,11 +26,21 @@ object Migrations {
         }
     }
 
-    // NEW 3→4
     val MIGRATION_3_4 = object : Migration(3, 4) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `transactions` ADD COLUMN `isRecurring` INTEGER NOT NULL DEFAULT 0")
             db.execSQL("ALTER TABLE `transactions` ADD COLUMN `recurringRuleId` INTEGER")
+        }
+    }
+
+    // NEW 4→5 for userId and remoteId
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // userId is non-null in the entity, so provide a DEFAULT to satisfy existing rows
+            db.execSQL("ALTER TABLE `transactions` ADD COLUMN `userId` TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE `transactions` ADD COLUMN `remoteId` TEXT")
+            // optional indices for query performance later:
+            // db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_userId_date` ON `transactions`(`userId`, `date`)")
         }
     }
 }

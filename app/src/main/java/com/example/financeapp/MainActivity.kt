@@ -9,9 +9,20 @@ import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.financeapp.feature_auth.domain.model.AuthUser
+import com.example.financeapp.feature_auth.presentation.auth.AuthViewModel
+import com.example.financeapp.feature_auth.presentation.login.LoginScreen
+import com.example.financeapp.feature_auth.presentation.register.RegisterScreen
 import com.example.financeapp.feature_settings.SettingsScreen
 import com.example.financeapp.feature_transaction.presentation.add_edit.AddEditTransactionScreen
 import com.example.financeapp.feature_transaction.presentation.budgets.BudgetsScreen
@@ -19,8 +30,10 @@ import com.example.financeapp.feature_transaction.presentation.reports.ReportsSc
 import com.example.financeapp.feature_transaction.presentation.scan.ScanReceiptScreen
 import com.example.financeapp.feature_transaction.presentation.transaction_list.TransactionListScreen
 import com.example.financeapp.ui.theme.FinanceappTheme
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -34,9 +47,35 @@ class MainActivity : ComponentActivity() {
             FinanceappTheme {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     val navController = rememberNavController()
+                    val authVm: AuthViewModel = hiltViewModel()
+                    val user by authVm.user.collectAsState()
+
+                    // 1) Decide initial screen once, based on cached Firebase user
+                    val startDest = remember {
+                        if (FirebaseAuth.getInstance().currentUser != null) "transaction_list" else "login"
+                    }
+
+                    // 2) Navigate only on real transitions
+                    var lastUser by remember { mutableStateOf<AuthUser?>(null) }
+                    LaunchedEffect(user) {
+                        // Logged out transition
+                        if (lastUser != null && user == null) {
+                            navController.navigate("login") {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                        // Logged in transition from login/register
+                        if (lastUser == null && user != null &&
+                            navController.currentDestination?.route in listOf("login", "register")) {
+                            navController.navigate("transaction_list") {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                        lastUser = user
+                    }
                     NavHost(
                         navController = navController,
-                        startDestination = "transaction_list"
+                        startDestination = startDest
                     ) {
                         composable("transaction_list") {
                             TransactionListScreen(
@@ -48,7 +87,26 @@ class MainActivity : ComponentActivity() {
                                 onOpenScanReceipt = { navController.navigate("scan_receipt") }
                             )
                         }
-
+                        composable("login") {
+                            LoginScreen(
+                                onLoginSuccess = {
+                                    navController.navigate("transaction_list") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                },
+                                onNavigateRegister = { navController.navigate("register") }
+                            )
+                        }
+                        composable("register") {
+                            RegisterScreen(
+                                onRegisterSuccess = {
+                                    navController.navigate("transaction_list") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                },
+                                onNavigateLogin = { navController.popBackStack() }
+                            )
+                        }
                         composable("reports") {
                             ReportsScreen(
                                 onBack = { navController.popBackStack() },

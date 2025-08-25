@@ -2,11 +2,20 @@ package com.example.financeapp.di
 
 import android.app.Application
 import androidx.room.Room
+import com.example.financeapp.feature_auth.data.FirebaseAuthRepository
+import com.example.financeapp.feature_auth.domain.repository.AuthRepository
+import com.example.financeapp.feature_auth.domain.use_case.AuthUseCases
+import com.example.financeapp.feature_auth.domain.use_case.ObserveAuthState
+import com.example.financeapp.feature_auth.domain.use_case.RegisterEmail
+import com.example.financeapp.feature_auth.domain.use_case.SignInEmail
+import com.example.financeapp.feature_auth.domain.use_case.SignInGoogle
+import com.example.financeapp.feature_auth.domain.use_case.SignOut
 import com.example.financeapp.feature_transaction.data.local.BudgetDao
 import com.example.financeapp.feature_transaction.data.local.Migrations
 import com.example.financeapp.feature_transaction.data.local.RecurringDao
 import com.example.financeapp.feature_transaction.data.local.TransactionDao
 import com.example.financeapp.feature_transaction.data.local.TransactionDatabase
+import com.example.financeapp.feature_transaction.data.remote.TransactionRemoteDataSource
 import com.example.financeapp.feature_transaction.data.repository.BudgetRepositoryImpl
 import com.example.financeapp.feature_transaction.data.repository.RecurringRepositoryImpl
 import com.example.financeapp.feature_transaction.domain.recurring.RecurringProcessor
@@ -24,6 +33,8 @@ import com.example.financeapp.feature_transaction.domain.use_case.transaction.Ge
 import com.example.financeapp.feature_transaction.domain.use_case.transaction.GetTransactions
 import com.example.financeapp.feature_transaction.domain.use_case.transaction.TransactionUseCases
 import com.example.financeapp.feature_transaction.presentation.budgets.BudgetAlertStore
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,7 +49,12 @@ object AppModule {
     @Singleton
     fun provideTransactionDatabase(app: Application): TransactionDatabase {
         return Room.databaseBuilder(app, TransactionDatabase::class.java, "transaction_db")
-            .addMigrations(Migrations.MIGRATION_2_3, Migrations.MIGRATION_3_4)
+            .addMigrations(
+                Migrations.MIGRATION_2_3,
+                Migrations.MIGRATION_3_4,
+                Migrations.MIGRATION_4_5   // <— add this
+            )
+            // .fallbackToDestructiveMigration()      // dev-only escape hatch if you do not need old data
             .build()
     }
 
@@ -46,11 +62,13 @@ object AppModule {
     @Singleton
     fun provideTransactionDao(db: TransactionDatabase) = db.transactionDao
 
-    @Provides
     @Singleton
-    fun provideTransactionRepository(dao: TransactionDao): TransactionRepository {
-        return TransactionRepositoryImpl(dao)
-    }
+    @Provides
+    fun provideTransactionRepository(
+        dao: TransactionDao,
+        remote: TransactionRemoteDataSource,
+        auth: FirebaseAuth
+    ): TransactionRepository = TransactionRepositoryImpl(dao, remote, auth)
 
     @Provides
     @Singleton
@@ -106,4 +124,27 @@ object AppModule {
         @dagger.hilt.android.qualifiers.ApplicationContext ctx: android.content.Context
     ) = BudgetAlertStore(ctx)
 
+    @Provides @Singleton
+    fun provideFirebaseAuth(): FirebaseAuth = FirebaseAuth.getInstance()
+
+    @Provides @Singleton
+    fun provideAuthRepository(auth: FirebaseAuth): AuthRepository = FirebaseAuthRepository(auth)
+
+    // Auth UseCases
+    @Provides @Singleton
+    fun provideAuthUseCases(repo: AuthRepository) = AuthUseCases(
+        observeAuthState = ObserveAuthState(repo),
+        signInEmail = SignInEmail(repo),
+        registerEmail = RegisterEmail(repo),
+        signInGoogle = SignInGoogle(repo),
+        signOut = SignOut(repo)
+    )
+
+    // di/AppModule.kt
+    @Provides fun provideFirestore(): FirebaseFirestore = FirebaseFirestore.getInstance()
+
+    @Singleton
+    @Provides
+    fun provideTransactionRemoteDataSource(db: FirebaseFirestore) =
+        TransactionRemoteDataSource(db)
 }

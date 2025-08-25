@@ -20,4 +20,6 @@ interface TransactionDao {
 
     @Query("SELECT * FROM transactions WHERE date >= :start AND date < :end")
     suspend fun getBetween(start: Long, end: Long): List<TransactionEntity>
+    @Query("DELETE FROM transactions")
+    suspend fun clearAll()
 }

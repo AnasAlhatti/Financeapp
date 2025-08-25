@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/financeapp/feature_settings/CurrencyFormat.kt
 package com.example.financeapp.feature_settings
 
 import androidx.compose.runtime.*

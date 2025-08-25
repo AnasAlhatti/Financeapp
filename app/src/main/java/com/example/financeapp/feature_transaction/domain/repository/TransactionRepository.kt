@@ -9,4 +9,7 @@ interface TransactionRepository {
     suspend fun insertTransaction(transaction: Transaction)
     suspend fun deleteTransaction(transaction: Transaction)
     suspend fun getBetween(start: Long, end: Long): List<Transaction>
+    fun startSync(uid: String)
+    fun stopSync()
+    suspend fun clearLocal()
 }

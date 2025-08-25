@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.financeapp.feature_auth.presentation.auth.AuthViewModel
 import com.example.financeapp.feature_transaction.presentation.budgets.BudgetsSummaryViewModel
 import com.example.financeapp.feature_transaction.presentation.transaction_list.AmountFilter
 import com.example.financeapp.feature_transaction.presentation.transaction_list.DateRange
@@ -51,6 +52,8 @@ fun ReportsScreen(
     val nf = com.example.financeapp.feature_settings.rememberCurrencyFormatter(code)
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val authVm: AuthViewModel = hiltViewModel()
+    val authUser by authVm.user.collectAsState()
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -75,7 +78,13 @@ fun ReportsScreen(
                     scope.launch { drawerState.close() }
                     onOpenScanReceipt()
                 },
-                selectedRoute = DrawerRoute.Reports
+                selectedRoute = DrawerRoute.Reports,
+
+                currentUserEmail = authUser?.email,
+                onLogout = {
+                    scope.launch { drawerState.close() }
+                    authVm.logout()
+                }
             )
         }
     ) {

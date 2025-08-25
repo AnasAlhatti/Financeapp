@@ -9,6 +9,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.financeapp.feature_auth.presentation.auth.AuthViewModel
+import com.example.financeapp.ui.common.DrawerRoute
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -24,6 +26,8 @@ fun SettingsScreen(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val code by viewModel.currencyCode.collectAsState()
+    val authVm: AuthViewModel = hiltViewModel()
+    val authUser by authVm.user.collectAsState()
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -46,7 +50,12 @@ fun SettingsScreen(
                     onOpenScanReceipt()
                 },
                 onNavigateSettings = { scope.launch { drawerState.close() } },
-                selectedRoute = com.example.financeapp.ui.common.DrawerRoute.Settings
+                currentUserEmail = authUser?.email,
+                onLogout = {
+                    scope.launch { drawerState.close() }
+                    authVm.logout()
+                },
+                selectedRoute = DrawerRoute.Settings
             )
         }
     ) {

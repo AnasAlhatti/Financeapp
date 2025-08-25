@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.financeapp.feature_auth.presentation.auth.AuthViewModel
 import com.example.financeapp.ui.common.AppDrawer
 import com.example.financeapp.ui.common.DrawerRoute
 import kotlinx.coroutines.launch
@@ -46,9 +47,11 @@ fun BudgetsScreen(
     var editId by remember { mutableStateOf<Int?>(null) }
     var category by remember { mutableStateOf("") }
     var amountInput by remember { mutableStateOf("") }
-
+    val authVm: AuthViewModel = hiltViewModel()
+    val authUser by authVm.user.collectAsState()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
     @Composable
     fun RequestPostNotificationsPermissionOnce() {
         if (Build.VERSION.SDK_INT < 33) return
@@ -90,7 +93,13 @@ fun BudgetsScreen(
                     scope.launch { drawerState.close() }
                     onOpenScanReceipt()
                 },
-                selectedRoute = DrawerRoute.Budgets
+                selectedRoute = DrawerRoute.Budgets,
+
+                currentUserEmail = authUser?.email,
+                onLogout = {
+                    scope.launch { drawerState.close() }
+                    authVm.logout()
+                }
             )
         }
     ) {

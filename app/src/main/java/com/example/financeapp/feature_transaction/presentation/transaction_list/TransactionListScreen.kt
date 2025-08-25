@@ -8,7 +8,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,8 +18,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
@@ -32,7 +33,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,10 +54,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.financeapp.feature_auth.presentation.auth.AuthViewModel
 import com.example.financeapp.feature_settings.CurrencyViewModel
 import com.example.financeapp.feature_settings.rememberCurrencyFormatter
 import com.example.financeapp.feature_transaction.domain.model.Transaction
@@ -68,10 +73,8 @@ import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
-import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.time.YearMonth
-import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 
@@ -97,7 +100,8 @@ fun TransactionListScreen(
     val scope = rememberCoroutineScope()
 
     var showMonthPicker by remember { mutableStateOf(false) }
-
+    val authVm: AuthViewModel = hiltViewModel()
+    val authUser by authVm.user.collectAsState()
     // Drawer state
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
@@ -109,7 +113,7 @@ fun TransactionListScreen(
         ActivityResultContracts.CreateDocument("text/csv")
     ) { uri: Uri? ->
         if (uri != null) {
-            val all = uiState.allTransactions // or uiState.filteredTransactions if you want only current selection
+            val all = uiState.allTransactions
             val ok = writeTransactionsCsv(context, uri, all)
             scope.launch {
                 snackbarHostState.showSnackbar(
@@ -152,6 +156,10 @@ fun TransactionListScreen(
                     scope.launch { drawerState.close() }
                     onOpenSettings()
                 },
+                onNavigateScanReceipt = {
+                    scope.launch { drawerState.close() }
+                    onOpenScanReceipt()
+                },
                 selectedRoute = DrawerRoute.Transactions,
                 onExportCsv = {
                     scope.launch { drawerState.close() }
@@ -161,9 +169,10 @@ fun TransactionListScreen(
                     scope.launch { drawerState.close() }
                     importLauncher.launch(arrayOf("text/*", "text/csv", "application/csv"))
                 },
-                onNavigateScanReceipt = {
+                currentUserEmail = authUser?.email,
+                onLogout = {
                     scope.launch { drawerState.close() }
-                onOpenScanReceipt()
+                    authVm.logout()
                 }
             )
         }
@@ -275,23 +284,33 @@ private fun TotalsHeader(
     balance: String,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        userScrollEnabled = false
     ) {
-        SummaryCard(title = "Income", value = income, modifier = Modifier.weight(1f))
-        SummaryCard(title = "Expense", value = expense, modifier = Modifier.weight(1f))
-        SummaryCard(title = "Balance", value = balance, modifier = Modifier.weight(1f))
+        item { SummaryCard(title = "Income", value = income, modifier = Modifier.fillMaxWidth()) }
+        item { SummaryCard(title = "Expense", value = expense, modifier = Modifier.fillMaxWidth()) }
+        item(span = { GridItemSpan(2) }) {
+            SummaryCard(title = "Balance", value = balance, modifier = Modifier.fillMaxWidth())
+        }
     }
 }
 
 @Composable
 private fun SummaryCard(title: String, value: String, modifier: Modifier = Modifier) {
     ElevatedCard(modifier) {
-        Column(Modifier.padding(12.dp)) {
-            Text(title, style = MaterialTheme.typography.labelMedium)
-            Spacer(Modifier.height(4.dp))
-            Text(value, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.padding(16.dp)) {
+            Text(title, style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(6.dp))
+            AutoResizeText(
+                text = value,
+                style = MaterialTheme.typography.titleLarge, // reasonable starting size
+                minSize = 14.sp,
+                maxSize = 20.sp                              // never bigger than this
+            )
         }
     }
 }
@@ -414,8 +433,8 @@ private fun writeTransactionsCsv(
 private fun readTransactionsCsv(
     context: Context,
     uri: Uri
-): List<com.example.financeapp.feature_transaction.domain.model.Transaction> {
-    val result = mutableListOf<com.example.financeapp.feature_transaction.domain.model.Transaction>()
+): List<Transaction> {
+    val result = mutableListOf<Transaction>()
     context.contentResolver.openInputStream(uri)?.use { input ->
         BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { br ->
             var first = true
@@ -438,7 +457,7 @@ private fun readTransactionsCsv(
                 val amount = cols[3].toDoubleOrNull() ?: return@forEach
                 val recurring = cols[4].toBooleanStrictOrNull() ?: cols[4].equals("true", ignoreCase = true)
 
-                result += com.example.financeapp.feature_transaction.domain.model.Transaction(
+                result += Transaction(
                     id = null,
                     title = title,
                     amount = amount,
@@ -504,4 +523,45 @@ fun String.csvEsc(): String {
     val mustQuote = contains(',') || contains('"') || contains('\n') || contains('\r')
     val cleaned = replace("\"", "\"\"")
     return if (mustQuote) "\"$cleaned\"" else cleaned
+}
+
+@Composable
+private fun AutoResizeText(
+    text: String,
+    style: TextStyle,
+    modifier: Modifier = Modifier,
+    maxLines: Int = 1,
+    minSize: TextUnit = 14.sp,
+    maxSize: TextUnit = 20.sp,   // ⬅️ hard cap so it never gets huge
+    stepSp: Float = 1f
+) {
+    val maxSp = maxSize.value
+    val minSp = minSize.value
+    var sizeSp by remember {
+        mutableStateOf(
+            // start at the smaller of style size or max
+            (if (style.fontSize != TextUnit.Unspecified) style.fontSize.value else maxSp)
+                .coerceAtMost(maxSp)
+        )
+    }
+    var ready by remember { mutableStateOf(false) }
+
+    Text(
+        text = text,
+        maxLines = maxLines,
+        softWrap = false,
+        overflow = TextOverflow.Clip,
+        style = style.copy(
+            fontSize = sizeSp.sp,
+            fontFeatureSettings = "tnum" // tabular digits
+        ),
+        modifier = modifier.drawWithContent { if (ready) drawContent() },
+        onTextLayout = { res ->
+            if ((res.didOverflowWidth || res.didOverflowHeight) && sizeSp > minSp) {
+                sizeSp = (sizeSp - stepSp).coerceAtLeast(minSp)
+            } else {
+                ready = true
+            }
+        }
+    )
 }
