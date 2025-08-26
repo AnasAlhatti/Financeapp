@@ -1,5 +1,7 @@
 package com.example.financeapp.feature_transaction.presentation.budgets
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.financeapp.feature_transaction.domain.model.Budget
@@ -25,6 +27,7 @@ data class BudgetsState(
     val categories: List<String> = emptyList() // ✅ suggest from existing tx
 )
 
+@RequiresApi(Build.VERSION_CODES.O)
 @HiltViewModel
 class BudgetsViewModel @Inject constructor(
     private val budgetUse: BudgetUseCases,
@@ -36,6 +39,7 @@ class BudgetsViewModel @Inject constructor(
 
     init { observe() }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun observe() {
         val zone = ZoneId.systemDefault()
         val ym = YearMonth.now()

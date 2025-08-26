@@ -103,7 +103,7 @@ fun FilterBar(
             if (hasActiveFilters) {
                 IconButton(onClick = onClearAll) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Rounded.Clear,
+                        imageVector = Icons.Rounded.Clear,
                         contentDescription = "Clear filters",
                         tint = MaterialTheme.colorScheme.primary
                     )
@@ -129,7 +129,7 @@ private fun DateMenuChip(
             label = { Text(label) },
             leadingIcon = {
                 Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Rounded.DateRange,
+                    imageVector = Icons.Rounded.DateRange,
                     contentDescription = null
                 )
             }
@@ -158,7 +158,7 @@ private fun TypeMenuChip(
             label = { Text(label) },
             leadingIcon = {
                 Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Rounded.SwapVert,
+                    imageVector = Icons.Rounded.SwapVert,
                     contentDescription = null
                 )
             }

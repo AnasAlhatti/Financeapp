@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -103,6 +104,21 @@ fun SettingsScreen(
                     label = "UAE Dirham (AED)",
                     selected = code == "AED",
                     onClick = { viewModel.setCurrency("AED") }
+                )
+                HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
+                Text("Display", style = MaterialTheme.typography.titleMedium)
+
+                val compact by viewModel.compactMoney.collectAsState()
+                ListItem(
+                    headlineContent = { Text("Compact money in header") },
+                    supportingContent = { Text("Show 1.2K / 3.4M on summary cards") },
+                    trailingContent = {
+                        Switch(
+                            checked = compact,
+                            onCheckedChange = { viewModel.setCompactMoney(it) }
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

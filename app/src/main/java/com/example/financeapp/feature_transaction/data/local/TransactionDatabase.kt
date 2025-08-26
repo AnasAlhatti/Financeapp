@@ -10,7 +10,7 @@ import androidx.room.RoomDatabase
         BudgetEntity::class,
         RecurringEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2) // keep your existing auto-migration

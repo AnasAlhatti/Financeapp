@@ -30,15 +30,25 @@ class TransactionRepositoryImpl(
 
     override suspend fun insertTransaction(transaction: Transaction) {
         val uid = auth.currentUser?.uid ?: return
-        val ensured = transaction.copy(userId = uid)
-        val entity = ensured.toEntity()
-        val remoteId = remote.upsert(uid, entity)
-        dao.insertTransaction(entity.copy(remoteId = remoteId))
+
+        val existingRemoteId: String? = when {
+            transaction.remoteId != null -> transaction.remoteId
+            transaction.id != null       -> dao.getTransactionById(transaction.id!!)?.remoteId
+            else                         -> null
+        }
+        val base = transaction.copy(userId = uid, remoteId = existingRemoteId)
+        val entity = base.toEntity()
+        val assignedRemoteId = remote.upsert(uid, entity.copy(remoteId = existingRemoteId))
+
+        dao.insertTransaction(entity.copy(remoteId = assignedRemoteId))
     }
 
     override suspend fun deleteTransaction(transaction: Transaction) {
         val uid = auth.currentUser?.uid ?: return
-        transaction.remoteId?.let { remote.delete(uid, it) }
+        val rid = transaction.remoteId
+            ?: transaction.id?.let { dao.getTransactionById(it)?.remoteId }
+        rid?.let { remote.delete(uid, it) }
+
         dao.deleteTransaction(transaction.copy(userId = uid).toEntity())
     }
 

@@ -15,6 +15,7 @@ import com.example.financeapp.feature_transaction.data.local.Migrations
 import com.example.financeapp.feature_transaction.data.local.RecurringDao
 import com.example.financeapp.feature_transaction.data.local.TransactionDao
 import com.example.financeapp.feature_transaction.data.local.TransactionDatabase
+import com.example.financeapp.feature_transaction.data.remote.BudgetRemoteDataSource
 import com.example.financeapp.feature_transaction.data.remote.TransactionRemoteDataSource
 import com.example.financeapp.feature_transaction.data.repository.BudgetRepositoryImpl
 import com.example.financeapp.feature_transaction.data.repository.RecurringRepositoryImpl
@@ -52,9 +53,10 @@ object AppModule {
             .addMigrations(
                 Migrations.MIGRATION_2_3,
                 Migrations.MIGRATION_3_4,
-                Migrations.MIGRATION_4_5   // <— add this
+                Migrations.MIGRATION_4_5,
+                Migrations.MIGRATION_5_6
             )
-            // .fallbackToDestructiveMigration()      // dev-only escape hatch if you do not need old data
+            // .fallbackToDestructiveMigration()
             .build()
     }
 
@@ -85,8 +87,14 @@ object AppModule {
     fun provideBudgetDao(db: TransactionDatabase) = db.budgetDao
 
     @Provides @Singleton
-    fun provideBudgetRepository(dao: BudgetDao): BudgetRepository =
-        BudgetRepositoryImpl(dao)
+    fun provideBudgetRepository(
+        dao: BudgetDao,
+        remote: BudgetRemoteDataSource,
+        auth: FirebaseAuth
+    ): BudgetRepository = BudgetRepositoryImpl(dao, remote, auth)
+
+    @Provides @Singleton
+    fun provideBudgetRemote(ds: FirebaseFirestore) = BudgetRemoteDataSource(ds)
 
     // DAOs
     @Provides @Singleton
@@ -147,4 +155,5 @@ object AppModule {
     @Provides
     fun provideTransactionRemoteDataSource(db: FirebaseFirestore) =
         TransactionRemoteDataSource(db)
+
 }

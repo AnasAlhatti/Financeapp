@@ -1,6 +1,7 @@
 package com.example.financeapp.core.prefs
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -15,11 +16,24 @@ private val KEY_CURRENCY = stringPreferencesKey("currency_code")
 class CurrencyPrefs @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    // Default to TRY because your timezone is Istanbul; change if you prefer USD
+    private val dataStore = context.dataStore  // your existing extension
+
+    private object Keys {
+        val CURRENCY = stringPreferencesKey("currency_code")
+        val COMPACT = booleanPreferencesKey("compact_money")
+    }
+
     val currencyCodeFlow: Flow<String> =
-        context.dataStore.data.map { it[KEY_CURRENCY] ?: "TRY" }
+        dataStore.data.map { it[Keys.CURRENCY] ?: "TRY" }
+
+    val compactMoneyFlow: Flow<Boolean> =
+        dataStore.data.map { it[Keys.COMPACT] ?: false }
 
     suspend fun setCurrency(code: String) {
-        context.dataStore.edit { it[KEY_CURRENCY] = code }
+        dataStore.edit { it[Keys.CURRENCY] = code }
+    }
+
+    suspend fun setCompactMoney(enabled: Boolean) {
+        dataStore.edit { it[Keys.COMPACT] = enabled }
     }
 }

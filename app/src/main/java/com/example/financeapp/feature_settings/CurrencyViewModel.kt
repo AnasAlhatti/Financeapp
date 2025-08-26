@@ -15,7 +15,9 @@ class CurrencyViewModel @Inject constructor(
     val currencyCode: StateFlow<String> =
         prefs.currencyCodeFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "TRY")
 
-    fun setCurrency(code: String) = viewModelScope.launch {
-        prefs.setCurrency(code)
-    }
+    val compactMoney: StateFlow<Boolean> =
+        prefs.compactMoneyFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setCurrency(code: String) = viewModelScope.launch { prefs.setCurrency(code) }
+    fun setCompactMoney(enabled: Boolean) = viewModelScope.launch { prefs.setCompactMoney(enabled) }
 }

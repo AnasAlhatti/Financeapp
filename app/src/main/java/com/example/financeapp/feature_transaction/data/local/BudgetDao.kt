@@ -5,15 +5,18 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface BudgetDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: BudgetEntity): Long
+
+    @Delete
+    suspend fun delete(entity: BudgetEntity)
+
     @Query("SELECT * FROM budgets ORDER BY category ASC")
     fun getBudgets(): Flow<List<BudgetEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(budget: BudgetEntity)
-
-    @Delete
-    suspend fun delete(budget: BudgetEntity)
-
     @Query("SELECT * FROM budgets WHERE id = :id LIMIT 1")
     suspend fun getById(id: Int): BudgetEntity?
+
+    @Query("DELETE FROM budgets")
+    suspend fun clearAll()
 }

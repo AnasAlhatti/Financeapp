@@ -1,5 +1,7 @@
 package com.example.financeapp.feature_transaction.presentation.transaction_list
 
+import android.R.attr.maxWidth
+import android.annotation.SuppressLint
 import android.content.Context
 import android.icu.text.DateFormat
 import android.net.Uri
@@ -7,8 +9,11 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,15 +21,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Autorenew
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -44,19 +55,30 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -64,11 +86,13 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.financeapp.feature_auth.presentation.auth.AuthViewModel
 import com.example.financeapp.feature_settings.CurrencyViewModel
+import com.example.financeapp.feature_settings.rememberCompactMoneyFormatter
 import com.example.financeapp.feature_settings.rememberCurrencyFormatter
 import com.example.financeapp.feature_transaction.domain.model.Transaction
 import com.example.financeapp.feature_transaction.presentation.budgets.BudgetWarningsBanner
 import com.example.financeapp.ui.common.AppDrawer
 import com.example.financeapp.ui.common.DrawerRoute
+import com.example.financeapp.ui.common.rememberCategoryUi
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -95,9 +119,14 @@ fun TransactionListScreen(
     val currencyVm: CurrencyViewModel = hiltViewModel()
     val currencyCode by currencyVm.currencyCode.collectAsState()
     val currencyFormat = rememberCurrencyFormatter(currencyCode)
-
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    var searchMode by remember { mutableStateOf(false) }
+    val kb = LocalSoftwareKeyboardController.current
+    val focusRequester = remember { FocusRequester() }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val compact by currencyVm.compactMoney.collectAsState()
+    val compactMoney = rememberCompactMoneyFormatter(currencyCode)
 
     var showMonthPicker by remember { mutableStateOf(false) }
     val authVm: AuthViewModel = hiltViewModel()
@@ -180,12 +209,56 @@ fun TransactionListScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Transactions") },
+                    title = {
+                        if (searchMode) {
+                            TextField(
+                                value = searchQuery,
+                                onValueChange = viewModel::onQueryChange,
+                                singleLine = true,
+                                placeholder = { Text("Search transactions") },
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(
+                                    onSearch = { kb?.hide() }
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(focusRequester),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+                                ),
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { viewModel.onQueryChange("") }) {
+                                            Icon(Icons.Filled.Close, contentDescription = "Clear")
+                                        }
+                                    }
+                                }
+                            )
+                        } else {
+                            Text("Transactions")
+                        }
+                    },
                     navigationIcon = {
                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(imageVector = Icons.Filled.Menu, contentDescription = "Open navigation")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            if (searchMode) {
+                                viewModel.clearQuery()
+                                searchMode = false
+                                kb?.hide()
+                            } else {
+                                searchMode = true
+                            }
+                        }) {
                             Icon(
-                                imageVector = Icons.Filled.Menu,
-                                contentDescription = "Open navigation"
+                                imageVector = if (searchMode) Icons.Filled.Close else Icons.Filled.Search,
+                                contentDescription = if (searchMode) "Close search" else "Search"
                             )
                         }
                     }
@@ -201,10 +274,11 @@ fun TransactionListScreen(
             ) {
                 Spacer(Modifier.height(4.dp))
 
-                TotalsHeader(
-                    income = currencyFormat.format(uiState.totalIncome),
-                    expense = currencyFormat.format(uiState.totalExpense),
-                    balance = currencyFormat.format(uiState.balance),
+                TotalsHeaderAdaptive(
+                    income  = if (compact) compactMoney(uiState.totalIncome)  else currencyFormat.format(uiState.totalIncome),
+                    expense = if (compact) compactMoney(uiState.totalExpense) else currencyFormat.format(uiState.totalExpense),
+                    balance = if (compact) compactMoney(uiState.balance)     else currencyFormat.format(uiState.balance),
+                    compactEnabled = compact,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
 
@@ -314,84 +388,163 @@ private fun SummaryCard(title: String, value: String, modifier: Modifier = Modif
         }
     }
 }
+@SuppressLint("UnusedBoxWithConstraintsScope")
+@Composable
+private fun TotalsHeaderAdaptive(
+    income: String,
+    expense: String,
+    balance: String,
+    compactEnabled: Boolean,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val measurer = rememberTextMeasurer()
+        val density = LocalDensity.current
+        val spacing = 12.dp
+        val innerHPad = 32.dp // 16dp start + 16dp end inside card
+        val threeCardWidth = (maxWidth - spacing * 2) / 3
+        val textStyle = MaterialTheme.typography.titleLarge
 
+        // How wide are our texts at normal size?
+        val maxTextWidthPx = listOf(income, expense, balance).maxOf {
+            measurer.measure(AnnotatedString(it), style = textStyle).size.width
+        }
+        val textAreaWidthPx = with(density) { (threeCardWidth - innerHPad).coerceAtLeast(0.dp).toPx() }
+
+        val fitsThree = maxTextWidthPx <= textAreaWidthPx
+
+        if (compactEnabled || fitsThree) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing)
+            ) {
+                SummaryCard(title = "Income", value = income, modifier = Modifier.weight(1f))
+                SummaryCard(title = "Expense", value = expense, modifier = Modifier.weight(1f))
+                SummaryCard(title = "Balance", value = balance, modifier = Modifier.weight(1f))
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(spacing),
+                verticalArrangement = Arrangement.spacedBy(spacing),
+                userScrollEnabled = false,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                item { SummaryCard("Income", income, Modifier.fillMaxWidth()) }
+                item { SummaryCard("Expense", expense, Modifier.fillMaxWidth()) }
+                item(span = { GridItemSpan(2) }) {
+                    SummaryCard("Balance", balance, Modifier.fillMaxWidth())
+                }
+            }
+        }
+    }
+}
 @Composable
 private fun TransactionItem(
     transaction: Transaction,
     formattedDate: String,
-    nextOccurrenceMillis: Long? = null,
+    nextOccurrenceMillis: Long? = null, // unused in compact; add back if you want a third line
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
     val currencyVm: CurrencyViewModel = hiltViewModel()
     val currencyCode by currencyVm.currencyCode.collectAsState()
     val currencyFormat = rememberCurrencyFormatter(currencyCode)
+
+    val catUi = rememberCategoryUi(transaction.category)
+    val amountText = (if (transaction.amount >= 0) "+" else "-") +
+            currencyFormat.format(kotlin.math.abs(transaction.amount))
+    val amountColor =
+        if (transaction.amount >= 0) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.error
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp) // tighter spacing
             .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Row(
-            Modifier
-                .padding(16.dp)
+            modifier = Modifier
+                .padding(horizontal = 12.dp, vertical = 10.dp) // compact inner padding
                 .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(Modifier.weight(1f)) {
-
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Text(transaction.title, style = MaterialTheme.typography.titleMedium)
-                    if (transaction.isRecurring) {
-                        Spacer(Modifier.width(8.dp))
-                        AssistChip(
-                            onClick = { /* no-op */ },
-                            label = { Text("Recurring") },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Autorenew,
-                                    contentDescription = null
-                                )
-                            },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                leadingIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Category: ${transaction.category}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text("Date: $formattedDate", style = MaterialTheme.typography.bodySmall)
-
-                // ⬇️ Show next occurrence (when available)
-                if (transaction.isRecurring && nextOccurrenceMillis != null) {
-                    val ctx = LocalContext.current
-                    val mediumDf =
-                        remember(ctx) { android.text.format.DateFormat.getMediumDateFormat(ctx) }
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "Next on ${mediumDf.format(Date(nextOccurrenceMillis))}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = (if (transaction.amount >= 0) "+" else "-") +
-                            currencyFormat.format(kotlin.math.abs(transaction.amount)),
-                    style = MaterialTheme.typography.bodyMedium
+            // Leading round icon (smaller)
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(catUi.container, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = catUi.icon,
+                    contentDescription = null,
+                    tint = catUi.onContainer,
+                    modifier = Modifier.size(16.dp)
                 )
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete")
+
+            Spacer(Modifier.width(10.dp))
+
+            // Title + tiny row of category chip and date
+            Column(Modifier.weight(1f)) {
+                Text(
+                    transaction.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(Modifier.height(2.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Use SuggestionChip (smaller than AssistChip)
+                    androidx.compose.material3.SuggestionChip(
+                        onClick = { },
+                        icon = { Icon(catUi.icon, null, modifier = Modifier.size(14.dp)) },
+                        label = { Text(transaction.category, style = MaterialTheme.typography.labelSmall) },
+                        colors = androidx.compose.material3.SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = catUi.chipContainer,
+                            labelColor = catUi.chipLabel,
+                            iconContentColor = catUi.chipLabel
+                        )
+                    )
+
+                    Text(
+                        formattedDate,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(8.dp))
+
+            // Trailing: amount + delete (small)
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    amountText,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = amountColor,
+                    maxLines = 1
+                )
+                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = "Delete",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
@@ -538,7 +691,7 @@ private fun AutoResizeText(
     val maxSp = maxSize.value
     val minSp = minSize.value
     var sizeSp by remember {
-        mutableStateOf(
+        mutableFloatStateOf(
             // start at the smaller of style size or max
             (if (style.fontSize != TextUnit.Unspecified) style.fontSize.value else maxSp)
                 .coerceAtMost(maxSp)

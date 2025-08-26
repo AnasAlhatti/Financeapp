@@ -36,11 +36,15 @@ object Migrations {
     // NEW 4→5 for userId and remoteId
     val MIGRATION_4_5 = object : Migration(4, 5) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            // userId is non-null in the entity, so provide a DEFAULT to satisfy existing rows
             db.execSQL("ALTER TABLE `transactions` ADD COLUMN `userId` TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE `transactions` ADD COLUMN `remoteId` TEXT")
-            // optional indices for query performance later:
-            // db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_userId_date` ON `transactions`(`userId`, `date`)")
+        }
+    }
+    val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `budgets` ADD COLUMN `remoteId` TEXT")
+            db.execSQL("ALTER TABLE `budgets` ADD COLUMN `userId` TEXT")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_budgets_remoteId` ON `budgets`(`remoteId`)")
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.example.financeapp.feature_auth.data
 
+import android.util.Log
 import com.example.financeapp.feature_auth.domain.model.AuthUser
 import com.example.financeapp.feature_auth.domain.repository.AuthRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -9,7 +10,10 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
+
+private const val AUTH_TIMEOUT_MS = 15_000L
 
 class FirebaseAuthRepository @Inject constructor(
     private val auth: FirebaseAuth
@@ -24,16 +28,32 @@ class FirebaseAuthRepository @Inject constructor(
     }
 
     override suspend fun signInEmail(email: String, password: String): Result<Unit> =
-        runCatching { auth.signInWithEmailAndPassword(email, password).await() }.map { }
+        runCatching {
+            withTimeout(AUTH_TIMEOUT_MS) {
+                auth.signInWithEmailAndPassword(email, password).await()
+            }
+        }
+            .map { Unit }
+            .onFailure { e -> Log.e("AuthRepo", "signInEmail failed", e) }
 
     override suspend fun registerEmail(email: String, password: String): Result<Unit> =
-        runCatching { auth.createUserWithEmailAndPassword(email, password).await() }.map { }
+        runCatching {
+            withTimeout(AUTH_TIMEOUT_MS) {
+                auth.createUserWithEmailAndPassword(email, password).await()
+            }
+        }
+            .map { Unit }
+            .onFailure { e -> Log.e("AuthRepo", "registerEmail failed", e) }
 
     override suspend fun signInWithGoogle(idToken: String): Result<Unit> =
         runCatching {
             val credential = GoogleAuthProvider.getCredential(idToken, null)
-            auth.signInWithCredential(credential).await()
-        }.map { }
+            withTimeout(AUTH_TIMEOUT_MS) {
+                auth.signInWithCredential(credential).await()
+            }
+        }
+            .map { Unit }
+            .onFailure { e -> Log.e("AuthRepo", "signInWithGoogle failed", e) }
 
     override suspend fun signOut() { auth.signOut() }
 }
