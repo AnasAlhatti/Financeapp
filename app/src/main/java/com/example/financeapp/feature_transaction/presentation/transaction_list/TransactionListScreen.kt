@@ -1,6 +1,5 @@
 package com.example.financeapp.feature_transaction.presentation.transaction_list
 
-import android.R.attr.maxWidth
 import android.annotation.SuppressLint
 import android.content.Context
 import android.icu.text.DateFormat
@@ -9,6 +8,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,21 +24,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.rounded.Autorenew
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DrawerValue
@@ -54,13 +54,19 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -72,6 +78,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -80,9 +88,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.financeapp.feature_auth.presentation.auth.AuthViewModel
 import com.example.financeapp.feature_settings.CurrencyViewModel
@@ -114,29 +125,33 @@ fun TransactionListScreen(
     onOpenScanReceipt: () -> Unit,
     viewModel: TransactionListViewModel = hiltViewModel()
 ) {
+    // --- state & utils ---
     val uiState by viewModel.uiState.collectAsState()
     val dateFormatter = remember(LocalContext.current) { DateFormat.getDateInstance(DateFormat.MEDIUM) }
     val currencyVm: CurrencyViewModel = hiltViewModel()
     val currencyCode by currencyVm.currencyCode.collectAsState()
     val currencyFormat = rememberCurrencyFormatter(currencyCode)
+    val compact by currencyVm.compactMoney.collectAsState()
+    val compactMoney = rememberCompactMoneyFormatter(currencyCode)
+
     val searchQuery by viewModel.searchQuery.collectAsState()
     var searchMode by remember { mutableStateOf(false) }
     val kb = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
+
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val compact by currencyVm.compactMoney.collectAsState()
-    val compactMoney = rememberCompactMoneyFormatter(currencyCode)
 
     var showMonthPicker by remember { mutableStateOf(false) }
+
     val authVm: AuthViewModel = hiltViewModel()
     val authUser by authVm.user.collectAsState()
-    // Drawer state
+
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
-    // Budget warnings
     val budgetsVm: com.example.financeapp.feature_transaction.presentation.budgets.BudgetsSummaryViewModel = hiltViewModel()
     val warnings by budgetsVm.warnings.collectAsState()
+
     val context = LocalContext.current
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv")
@@ -151,8 +166,6 @@ fun TransactionListScreen(
             }
         }
     }
-
-// OpenDocument for import
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -160,35 +173,25 @@ fun TransactionListScreen(
             val imported = readTransactionsCsv(context, uri)
             if (imported.isNotEmpty()) {
                 viewModel.addTransactions(imported)
-                scope.launch {
-                    snackbarHostState.showSnackbar("Imported ${imported.size} transactions.")
-                }
+                scope.launch { snackbarHostState.showSnackbar("Imported ${imported.size} transactions.") }
             } else {
                 scope.launch { snackbarHostState.showSnackbar("No valid rows to import.") }
             }
         }
     }
+
+    // focus search box when opened
+    LaunchedEffect(searchMode) { if (searchMode) focusRequester.requestFocus() }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             AppDrawer(
-                onNavigateTransactions = { scope.launch { drawerState.close() } },   // already here
-                onNavigateReports = {
-                    scope.launch { drawerState.close() }
-                    onOpenReports()
-                },
-                onNavigateBudgets = {
-                    scope.launch { drawerState.close() }
-                    onOpenBudgets()
-                },
-                onNavigateSettings = {
-                    scope.launch { drawerState.close() }
-                    onOpenSettings()
-                },
-                onNavigateScanReceipt = {
-                    scope.launch { drawerState.close() }
-                    onOpenScanReceipt()
-                },
+                onNavigateTransactions = { scope.launch { drawerState.close() } },
+                onNavigateReports = { scope.launch { drawerState.close() }; onOpenReports() },
+                onNavigateBudgets = { scope.launch { drawerState.close() }; onOpenBudgets() },
+                onNavigateSettings = { scope.launch { drawerState.close() }; onOpenSettings() },
+                onNavigateScanReceipt = { scope.launch { drawerState.close() }; onOpenScanReceipt() },
                 selectedRoute = DrawerRoute.Transactions,
                 onExportCsv = {
                     scope.launch { drawerState.close() }
@@ -217,17 +220,15 @@ fun TransactionListScreen(
                                 singleLine = true,
                                 placeholder = { Text("Search transactions") },
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                keyboardActions = KeyboardActions(
-                                    onSearch = { kb?.hide() }
-                                ),
+                                keyboardActions = KeyboardActions(onSearch = { kb?.hide() }),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .focusRequester(focusRequester),
                                 colors = TextFieldDefaults.colors(
                                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                                    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                                    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent
                                 ),
                                 trailingIcon = {
                                     if (searchQuery.isNotEmpty()) {
@@ -252,9 +253,7 @@ fun TransactionListScreen(
                                 viewModel.clearQuery()
                                 searchMode = false
                                 kb?.hide()
-                            } else {
-                                searchMode = true
-                            }
+                            } else searchMode = true
                         }) {
                             Icon(
                                 imageVector = if (searchMode) Icons.Filled.Close else Icons.Filled.Search,
@@ -267,53 +266,125 @@ fun TransactionListScreen(
             floatingActionButton = { FloatingActionButton(onClick = onAddClick) { Text("+") } },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { padding ->
-            Column(
+
+            // single list with collapsing header + sticky filters + swipe rows
+            val listState = rememberLazyListState()
+            val collapse = rememberCollapseFraction(listState, maxOffset = 120.dp)
+
+            LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                Spacer(Modifier.height(4.dp))
+                // Collapsing header (cards + budgets)
+                item {
+                    Spacer(Modifier.height(4.dp))
+                    TotalsHeaderAdaptive(
+                        income  = if (compact) compactMoney(uiState.totalIncome)  else currencyFormat.format(uiState.totalIncome),
+                        expense = if (compact) compactMoney(uiState.totalExpense) else currencyFormat.format(uiState.totalExpense),
+                        balance = if (compact) compactMoney(uiState.balance)     else currencyFormat.format(uiState.balance),
+                        compactEnabled = compact,
+                        modifier = Modifier
+                            .padding(horizontal = lerp(16.dp, 12.dp, collapse))
+                            .graphicsLayer {
+                                val s = lerp(1f, 0.92f, collapse)
+                                scaleX = s
+                                scaleY = s
+                                alpha = lerp(1f, 0.88f, collapse)
+                            }
+                    )
 
-                TotalsHeaderAdaptive(
-                    income  = if (compact) compactMoney(uiState.totalIncome)  else currencyFormat.format(uiState.totalIncome),
-                    expense = if (compact) compactMoney(uiState.totalExpense) else currencyFormat.format(uiState.totalExpense),
-                    balance = if (compact) compactMoney(uiState.balance)     else currencyFormat.format(uiState.balance),
-                    compactEnabled = compact,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
+                    BudgetWarningsBanner(
+                        warnings = warnings,
+                        formatter = currencyFormat,
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp)
+                            .padding(top = lerp(8.dp, 4.dp, collapse))
+                            .graphicsLayer {
+                                val s = lerp(1f, 0.96f, collapse)
+                                scaleX = s
+                                scaleY = s
+                                alpha = lerp(1f, 0.92f, collapse)
+                            }
+                    )
 
-                BudgetWarningsBanner(
-                    warnings = warnings,
-                    formatter = currencyFormat,
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .padding(top = 8.dp)
-                )
+                    Spacer(Modifier.height(8.dp))
+                }
 
-                FilterBar(
-                    dateRange = uiState.dateRange,
-                    selectedMonth = uiState.selectedMonth,
-                    amountFilter = uiState.amountFilter,
-                    categories = uiState.categories,
-                    selectedCategory = uiState.selectedCategory,
-                    onDateRangeSelected = viewModel::onDateRangeSelected,
-                    onPickMonth = { showMonthPicker = true },
-                    onTypeSelected = viewModel::onTypeSelected,
-                    onCategorySelected = viewModel::onCategorySelected,
-                    onClearAll = {
-                        viewModel.onDateRangeSelected(DateRange.ALL)
-                        viewModel.onTypeSelected(AmountFilter.ALL)
-                        viewModel.onCategorySelected(null)
-                    },
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .padding(top = 8.dp)
-                )
+                // Pinned filters (change to item { ... } if you want them to scroll too)
+                stickyHeader {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.background)
+                    ) {
+                        FilterBar(
+                            dateRange = uiState.dateRange,
+                            selectedMonth = uiState.selectedMonth,
+                            amountFilter = uiState.amountFilter,
+                            categories = uiState.categories,
+                            selectedCategory = uiState.selectedCategory,
+                            onDateRangeSelected = viewModel::onDateRangeSelected,
+                            onPickMonth = { showMonthPicker = true },
+                            onTypeSelected = viewModel::onTypeSelected,
+                            onCategorySelected = viewModel::onCategorySelected,
+                            onClearAll = {
+                                viewModel.onDateRangeSelected(DateRange.ALL)
+                                viewModel.onTypeSelected(AmountFilter.ALL)
+                                viewModel.onCategorySelected(null)
+                            },
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                }
 
-                Spacer(Modifier.height(8.dp))
+                // Transactions with swipe
+                items(
+                    uiState.filteredTransactions,
+                    key = { it.stableKey() }
+                ) { tx ->
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { value ->
+                            when (value) {
+                                SwipeToDismissBoxValue.EndToStart -> {
+                                    // delete
+                                    viewModel.deleteTransaction(tx)
+                                    scope.launch {
+                                        val res = snackbarHostState.showSnackbar(
+                                            message = "Transaction deleted",
+                                            actionLabel = "Undo",
+                                            withDismissAction = true,
+                                            duration = SnackbarDuration.Short
+                                        )
+                                        if (res == SnackbarResult.ActionPerformed) {
+                                            viewModel.restoreLastDeleted()
+                                        }
+                                    }
+                                    true // dismiss the row
+                                }
+                                SwipeToDismissBoxValue.StartToEnd -> {
+                                    // edit
+                                    tx.id?.let(onEditClick)
+                                    false // do not dismiss content
+                                }
+                                else -> false
+                            }
+                        }
+                    )
 
-                LazyColumn(Modifier.fillMaxSize()) {
-                    items(uiState.filteredTransactions, key = { it.id ?: it.hashCode() }) { tx ->
+                    // Reset swipe state when the row (re)enters the list (e.g., after undo)
+                    LaunchedEffect(tx.stableKey()) {
+                        dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+                    }
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = true,
+                        enableDismissFromEndToStart = true,
+                        backgroundContent = { SwipeBg(dismissState) }
+                    ) {
                         TransactionItem(
                             transaction = tx,
                             formattedDate = dateFormatter.format(Date(tx.date)),
@@ -335,6 +406,8 @@ fun TransactionListScreen(
                         )
                     }
                 }
+
+                item { Spacer(Modifier.height(72.dp)) } // breathing room for FAB
             }
         }
     }
@@ -348,28 +421,6 @@ fun TransactionListScreen(
                 showMonthPicker = false
             }
         )
-    }
-}
-
-@Composable
-private fun TotalsHeader(
-    income: String,
-    expense: String,
-    balance: String,
-    modifier: Modifier = Modifier
-) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        userScrollEnabled = false
-    ) {
-        item { SummaryCard(title = "Income", value = income, modifier = Modifier.fillMaxWidth()) }
-        item { SummaryCard(title = "Expense", value = expense, modifier = Modifier.fillMaxWidth()) }
-        item(span = { GridItemSpan(2) }) {
-            SummaryCard(title = "Balance", value = balance, modifier = Modifier.fillMaxWidth())
-        }
     }
 }
 
@@ -401,15 +452,16 @@ private fun TotalsHeaderAdaptive(
         val measurer = rememberTextMeasurer()
         val density = LocalDensity.current
         val spacing = 12.dp
-        val innerHPad = 32.dp // 16dp start + 16dp end inside card
+        val innerHPad = 32.dp // 16 start + 16 end padding inside each card
         val threeCardWidth = (maxWidth - spacing * 2) / 3
         val textStyle = MaterialTheme.typography.titleLarge
 
-        // How wide are our texts at normal size?
+        // Measure widest label at normal size
         val maxTextWidthPx = listOf(income, expense, balance).maxOf {
             measurer.measure(AnnotatedString(it), style = textStyle).size.width
         }
-        val textAreaWidthPx = with(density) { (threeCardWidth - innerHPad).coerceAtLeast(0.dp).toPx() }
+        val textAreaWidthPx =
+            with(density) { (threeCardWidth - innerHPad).coerceAtLeast(0.dp).toPx() }
 
         val fitsThree = maxTextWidthPx <= textAreaWidthPx
 
@@ -423,18 +475,17 @@ private fun TotalsHeaderAdaptive(
                 SummaryCard(title = "Balance", value = balance, modifier = Modifier.weight(1f))
             }
         } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                horizontalArrangement = Arrangement.spacedBy(spacing),
-                verticalArrangement = Arrangement.spacedBy(spacing),
-                userScrollEnabled = false,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                item { SummaryCard("Income", income, Modifier.fillMaxWidth()) }
-                item { SummaryCard("Expense", expense, Modifier.fillMaxWidth()) }
-                item(span = { GridItemSpan(2) }) {
-                    SummaryCard("Balance", balance, Modifier.fillMaxWidth())
+            // Non-scrollable fallback layout: two on the first row, balance full width below
+            Column(Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing)
+                ) {
+                    SummaryCard("Income", income, Modifier.weight(1f))
+                    SummaryCard("Expense", expense, Modifier.weight(1f))
                 }
+                Spacer(Modifier.height(spacing))
+                SummaryCard("Balance", balance, Modifier.fillMaxWidth())
             }
         }
     }
@@ -443,7 +494,6 @@ private fun TotalsHeaderAdaptive(
 private fun TransactionItem(
     transaction: Transaction,
     formattedDate: String,
-    nextOccurrenceMillis: Long? = null, // unused in compact; add back if you want a third line
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -718,3 +768,71 @@ private fun AutoResizeText(
         }
     )
 }
+
+@Composable
+private fun SwipeBg(state: SwipeToDismissBoxState) {
+    val isSettled = state.targetValue == SwipeToDismissBoxValue.Settled &&
+            state.currentValue == SwipeToDismissBoxValue.Settled
+
+    val isDelete = state.targetValue == SwipeToDismissBoxValue.EndToStart
+    val isEdit   = state.targetValue == SwipeToDismissBoxValue.StartToEnd
+
+    val bg by animateColorAsState(
+        when {
+            isSettled -> Color.Transparent
+            isDelete  -> MaterialTheme.colorScheme.errorContainer
+            isEdit    -> MaterialTheme.colorScheme.primaryContainer
+            else      -> Color.Transparent
+        },
+        label = "swipe-bg"
+    )
+
+    val align = when {
+        isDelete -> Alignment.CenterEnd
+        isEdit   -> Alignment.CenterStart
+        else     -> Alignment.Center
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()     // exactly under the row
+            .background(bg)
+            .padding(horizontal = 20.dp),
+        contentAlignment = align
+    ) {
+        if (!isSettled) {
+            if (isDelete) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
+            } else if (isEdit) {
+                Icon(
+                    Icons.Filled.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+    }
+}
+@Composable
+private fun rememberCollapseFraction(
+    listState: LazyListState,
+    maxOffset: Dp
+): Float {
+    val maxPx = with(LocalDensity.current) { maxOffset.toPx() }
+    return remember(listState, maxPx) {
+        derivedStateOf {
+            when {
+                listState.firstVisibleItemIndex > 0 -> 1f
+                else -> (listState.firstVisibleItemScrollOffset.toFloat() / maxPx)
+                    .coerceIn(0f, 1f)
+            }
+        }
+    }.value
+}
+
+private fun Transaction.stableKey(): String =
+    id?.toString() ?: "${title}|${amount}|${date}"
