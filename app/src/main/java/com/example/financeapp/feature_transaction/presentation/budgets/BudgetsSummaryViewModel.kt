@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/financeapp/feature_transaction/presentation/budgets/BudgetsSummaryViewModel.kt
 package com.example.financeapp.feature_transaction.presentation.budgets
 
 import android.os.Build
@@ -21,7 +20,7 @@ data class BudgetWarning(
     val category: String,
     val spent: Double,
     val limit: Double,
-    val ratio: Double // 0..inf
+    val ratio: Double
 )
 
 @RequiresApi(Build.VERSION_CODES.O)

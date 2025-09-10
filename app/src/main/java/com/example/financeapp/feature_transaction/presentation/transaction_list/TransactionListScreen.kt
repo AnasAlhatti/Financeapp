@@ -25,9 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -735,7 +732,7 @@ private fun AutoResizeText(
     modifier: Modifier = Modifier,
     maxLines: Int = 1,
     minSize: TextUnit = 14.sp,
-    maxSize: TextUnit = 20.sp,   // ⬅️ hard cap so it never gets huge
+    maxSize: TextUnit = 20.sp,
     stepSp: Float = 1f
 ) {
     val maxSp = maxSize.value

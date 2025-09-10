@@ -18,13 +18,13 @@ import kotlin.math.abs
 data class BudgetUi(
     val budget: Budget,
     val spentThisMonth: Double,
-    val progress: Float, // 0..1
+    val progress: Float,
     val over: Boolean
 )
 
 data class BudgetsState(
     val items: List<BudgetUi> = emptyList(),
-    val categories: List<String> = emptyList() // ✅ suggest from existing tx
+    val categories: List<String> = emptyList()
 )
 
 @RequiresApi(Build.VERSION_CODES.O)

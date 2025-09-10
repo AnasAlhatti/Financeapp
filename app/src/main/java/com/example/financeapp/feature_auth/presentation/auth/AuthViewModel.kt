@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.financeapp.feature_auth.domain.model.AuthUser
 import com.example.financeapp.feature_auth.domain.use_case.AuthUseCases
+import com.example.financeapp.feature_transaction.domain.repository.BudgetRepository
 import com.example.financeapp.feature_transaction.domain.repository.TransactionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -13,7 +14,8 @@ import javax.inject.Inject
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val useCases: AuthUseCases,
-    private val transactionRepository: TransactionRepository   // <— inject repo
+    private val transactionRepository: TransactionRepository,
+    private val budgetRepository: BudgetRepository
 ) : ViewModel() {
 
     val user: StateFlow<AuthUser?> =
@@ -21,6 +23,7 @@ class AuthViewModel @Inject constructor(
             .onEach { u ->
                 if (u != null) {
                     transactionRepository.startSync(u.uid)   // begin mirroring
+                    budgetRepository.startSync(u.uid)
                 } else {
                     transactionRepository.stopSync()
                 }

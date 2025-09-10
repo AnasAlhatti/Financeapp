@@ -10,14 +10,14 @@ import androidx.room.RoomDatabase
         BudgetEntity::class,
         RecurringEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
     autoMigrations = [
-        AutoMigration(from = 1, to = 2) // keep your existing auto-migration
+        AutoMigration(from = 1, to = 2)
     ]
 )
 abstract class TransactionDatabase : RoomDatabase() {
     abstract val transactionDao: TransactionDao
     abstract val budgetDao: BudgetDao
-    abstract val recurringDao: RecurringDao   // ✅ expose DAO
+    abstract val recurringDao: RecurringDao
 }

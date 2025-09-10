@@ -25,8 +25,8 @@ data class RecurringFormState(
     val isExpense: Boolean = true,
     val category: String = "",
     val frequency: Frequency = Frequency.MONTHLY,
-    val dayOfWeek: Int? = null,     // 1..7 (MON..SUN)
-    val dayOfMonth: Int? = 1,       // 1..31
+    val dayOfWeek: Int? = null,
+    val dayOfMonth: Int? = 1,
     val startAt: Long = System.currentTimeMillis(),
     val hasEnd: Boolean = false,
     val endAt: Long? = null,
@@ -52,7 +52,7 @@ class ManageRecurringViewModel @Inject constructor(
                 frequency = state.frequency,
                 dayOfMonth = state.dayOfMonth,
                 dayOfWeek = state.dayOfWeek,
-                fromMillis = System.currentTimeMillis() - 1, // next occurrence >= now
+                fromMillis = System.currentTimeMillis() - 1,
                 zone = zone
             )
 
@@ -69,7 +69,6 @@ class ManageRecurringViewModel @Inject constructor(
                 nextAt = nextAt
             )
             useCases.upsertRecurring(rule)
-            // insert anything due right away
             processor.processDue()
         }
     }

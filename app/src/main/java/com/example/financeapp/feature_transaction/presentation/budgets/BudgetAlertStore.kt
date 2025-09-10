@@ -9,6 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import java.time.YearMonth
+import androidx.core.content.edit
 
 /** Stores last notified level per (category + month). Avoids repeated alerts. */
 @Singleton
@@ -24,7 +25,7 @@ class BudgetAlertStore @Inject constructor(
         prefs.getInt(key(category, ym), 0)
 
     fun setLevel(category: String, ym: YearMonth, level: Int) {
-        prefs.edit().putInt(key(category, ym), level).apply()
+        prefs.edit { putInt(key(category, ym), level) }
     }
 
     fun canPostNotifications(): Boolean {

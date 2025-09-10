@@ -7,7 +7,10 @@ import com.example.financeapp.feature_transaction.domain.model.Budget
 
 @Entity(
     tableName = "budgets",
-    indices = [Index(value = ["remoteId"], unique = true)]
+    indices = [
+        Index(value = ["remoteId"], unique = true),
+        Index(value = ["userId"])
+    ]
 )
 data class BudgetEntity(
     @PrimaryKey(autoGenerate = true) val id: Int? = null,

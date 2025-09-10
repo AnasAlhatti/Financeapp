@@ -74,7 +74,6 @@ class AddEditTransactionViewModel @Inject constructor(
                         amountInput = if (prefillAmount.isNotBlank()) prefillAmount else s.amountInput,
                         category = if (prefillCategory.isNotBlank()) prefillCategory else s.category,
                         dateMillis = if (prefillDate > 0) prefillDate else s.dateMillis
-                        // leave recurring fields as-is for new entries
                     )
                 }
             }
@@ -106,7 +105,6 @@ class AddEditTransactionViewModel @Inject constructor(
     @RequiresApi(Build.VERSION_CODES.O)
     fun save(onSuccess: () -> Unit) {
         val s = state.value
-        // ...your validation...
         viewModelScope.launch {
             _state.update { it.copy(isSaving = true, error = null) }
             try {

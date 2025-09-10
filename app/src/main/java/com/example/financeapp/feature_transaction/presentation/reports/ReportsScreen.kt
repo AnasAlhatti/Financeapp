@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,7 +14,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.financeapp.feature_auth.presentation.auth.AuthViewModel
+import com.example.financeapp.feature_transaction.presentation.budgets.BudgetLevel
 import com.example.financeapp.feature_transaction.presentation.budgets.BudgetsSummaryViewModel
+import com.example.financeapp.feature_transaction.presentation.budgets.colorForLevel
+import com.example.financeapp.feature_transaction.presentation.budgets.levelForRatio
 import com.example.financeapp.feature_transaction.presentation.transaction_list.AmountFilter
 import com.example.financeapp.feature_transaction.presentation.transaction_list.DateRange
 import com.example.financeapp.feature_transaction.presentation.transaction_list.FilterBar
@@ -30,6 +33,7 @@ import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.core.cartesian.data.columnSeries
 import kotlinx.coroutines.launch
+import java.text.NumberFormat.getCurrencyInstance
 import java.time.YearMonth
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -72,7 +76,7 @@ fun ReportsScreen(
                 },
                 onNavigateSettings = {
                     scope.launch { drawerState.close() }
-                    onOpenSettings()                // <-- use the new param
+                    onOpenSettings()
                 },
                 onNavigateScanReceipt = {
                     scope.launch { drawerState.close() }
@@ -99,7 +103,7 @@ fun ReportsScreen(
                     },
                     actions = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     }
                 )
@@ -111,7 +115,6 @@ fun ReportsScreen(
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
             ) {
-                // … your existing content unchanged …
                 FilterBar(
                     dateRange = ui.dateRange,
                     selectedMonth = ui.selectedMonth,
@@ -143,11 +146,11 @@ fun ReportsScreen(
                     Column(Modifier.padding(16.dp)) {
                         Text(title, style = MaterialTheme.typography.labelMedium)
                         Spacer(Modifier.height(4.dp))
-                        Text(nf.format(ui.total), style = MaterialTheme.typography.titleLarge)   // <-- here
+                        Text(nf.format(ui.total), style = MaterialTheme.typography.titleLarge)
                     }
                 }
                 if (warnings.isNotEmpty()) {
-                    val nf = remember { java.text.NumberFormat.getCurrencyInstance() }
+                    val nf = remember { getCurrencyInstance() }
                     Spacer(Modifier.height(12.dp))
                     ElevatedCard(
                         modifier = Modifier
@@ -163,11 +166,11 @@ fun ReportsScreen(
                             warnings.take(3).forEach { w ->
                                 val ratio = w.ratio
                                 val level =
-                                    com.example.financeapp.feature_transaction.presentation.budgets.levelForRatio(
+                                    levelForRatio(
                                         ratio
                                     )
                                 val barColor =
-                                    com.example.financeapp.feature_transaction.presentation.budgets.colorForLevel(
+                                    colorForLevel(
                                         level
                                     )
 
@@ -189,7 +192,6 @@ fun ReportsScreen(
                                     )
                                 }
                             }
-                            // Optional legend (kept as-is)
                             Spacer(Modifier.height(8.dp))
                             BudgetLegend()
                         }
@@ -223,14 +225,25 @@ fun ReportsScreen(
 
 @Composable
 private fun BudgetLegend() {
-    // Uses Material theme colors to explain the risk mapping.
-    // <60% -> primary, 60–80% -> secondary, 80–100% -> tertiary, >100% -> error
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Legend", style = MaterialTheme.typography.labelMedium)
-        LegendRow(color = MaterialTheme.colorScheme.primary, label = "< 60% (OK)")
-        LegendRow(color = MaterialTheme.colorScheme.secondary, label = "60–80% (Caution)")
-        LegendRow(color = MaterialTheme.colorScheme.tertiary, label = "80–100% (Warning)")
-        LegendRow(color = MaterialTheme.colorScheme.error, label = "> 100% (Over)")
+
+        LegendRow(
+            color = colorForLevel(BudgetLevel.OK),
+            label = "< 60% (OK)"
+        )
+        LegendRow(
+            color = colorForLevel(BudgetLevel.CAUTION),
+            label = "60–80% (Caution)"
+        )
+        LegendRow(
+            color = colorForLevel(BudgetLevel.WARNING),
+            label = "80–100% (Warning)"
+        )
+        LegendRow(
+            color = colorForLevel(BudgetLevel.OVER),
+            label = "> 100% (Over)"
+        )
     }
 }
 

@@ -34,7 +34,6 @@ object BudgetNotifier {
             ) == PackageManager.PERMISSION_GRANTED
         } else true
 
-        // Also honor system-level notification setting.
         val enabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
         return permOk && enabled
     }
@@ -75,7 +74,6 @@ object BudgetNotifier {
             NotificationManagerCompat.from(context)
                 .notify((category.hashCode() xor percent).and(0x7fffffff), notif)
         } catch (se: SecurityException) {
-            // Silently ignore if OS or permission blocked us at runtime.
         }
     }
 }

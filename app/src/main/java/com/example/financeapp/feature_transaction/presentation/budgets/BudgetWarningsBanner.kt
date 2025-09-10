@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun BudgetWarningsBanner(
     warnings: List<BudgetWarning>,
-    formatter: java.text.NumberFormat,      // <-- add this
+    formatter: java.text.NumberFormat,
     modifier: Modifier = Modifier
 ) {
     if (warnings.isEmpty()) return

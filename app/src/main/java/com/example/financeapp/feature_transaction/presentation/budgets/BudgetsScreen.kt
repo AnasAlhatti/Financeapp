@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,8 +27,8 @@ import com.example.financeapp.feature_auth.presentation.auth.AuthViewModel
 import com.example.financeapp.ui.common.AppDrawer
 import com.example.financeapp.ui.common.DrawerRoute
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetsScreen(
@@ -59,7 +60,7 @@ fun BudgetsScreen(
         val ctx = LocalContext.current
         val launcher = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission()
-        ) { /* granted/denied result ignored here */ }
+        ) {  }
 
         // Request only if not granted
         LaunchedEffect(Unit) {
@@ -87,7 +88,7 @@ fun BudgetsScreen(
                                     },
                 onNavigateSettings = {
                     scope.launch { drawerState.close() }
-                    onOpenSettings()                // <-- use the new param
+                    onOpenSettings()
                 },
                 onNavigateScanReceipt = {
                     scope.launch { drawerState.close() }

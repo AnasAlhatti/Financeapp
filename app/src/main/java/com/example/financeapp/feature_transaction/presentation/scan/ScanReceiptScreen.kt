@@ -89,7 +89,7 @@ data class ParsedReceipt(
     val merchant: String? = null,
     val dateMillis: Long? = null,
     val amount: Double? = null,
-    val currency: String? = null, // "USD","TRY","EUR","AED"
+    val currency: String? = null,
     val categorySuggestion: String? = null,
     val rawLines: List<String> = emptyList()
 )
@@ -493,8 +493,6 @@ private fun GridOverlay() {
         drawLine(gridColor, Offset(0f, 2f * h / 3f), Offset(w, 2f * h / 3f), stroke)
     }
 }
-
-// ----- OCR + helpers (unchanged except for EXIF decoding for preview) -----
 
 @RequiresApi(Build.VERSION_CODES.O)
 private suspend fun extractReceiptFromFile(

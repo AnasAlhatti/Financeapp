@@ -47,4 +47,12 @@ object Migrations {
             db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_budgets_remoteId` ON `budgets`(`remoteId`)")
         }
     }
+    val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Index for faster user-scoped queries
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_budgets_userId` ON `budgets`(`userId`)"
+            )
+        }
+    }
 }

@@ -6,12 +6,12 @@ data class AddEditTransactionState(
     val amountInput: String = "",
     val category: String = "Other",
     val dateMillis: Long = System.currentTimeMillis(),
-    val isExpense: Boolean = true, // ✅ new: default expense
+    val isExpense: Boolean = true,
     val isSaving: Boolean = false,
     val error: String? = null,
     val isRecurring: Boolean = false,
     val recurringFrequency: com.example.financeapp.feature_transaction.domain.model.Frequency =
-        com.example.financeapp.feature_transaction.domain.model.Frequency.MONTHLY, // default
+        com.example.financeapp.feature_transaction.domain.model.Frequency.MONTHLY,
     val hasEndDate: Boolean = false,
     val endDateMillis: Long? = null
 )

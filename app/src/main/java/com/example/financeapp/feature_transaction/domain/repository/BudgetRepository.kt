@@ -7,5 +7,7 @@ interface BudgetRepository {
     fun getBudgets(): Flow<List<Budget>>
     suspend fun upsert(budget: Budget)
     suspend fun delete(budget: Budget)
-    suspend fun getById(id: Int): Budget?
+     fun startSync(uid: String)
+     fun stopSync()
+    suspend fun clearLocal(uid: String)
 }
