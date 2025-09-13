@@ -40,9 +40,9 @@ Manage budgets and configure currency preferences.
 ### Scan & Menu
 Scan receipts and access the navigation drawer.
 
-| Scan Receipt | Menu |
+| Log In | Menu |
 |--------------|------|
-| ![Scan Receipt](screenshots/scan.png) | ![Menu](screenshots/menu.png) |
+| ![Log In](screenshots/login.png) | ![Menu](screenshots/menu.png) |
 
 ---
 
