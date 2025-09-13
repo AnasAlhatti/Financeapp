@@ -37,8 +37,8 @@ Manage budgets and configure currency preferences.
 |---------|----------|
 | ![Budgets](screenshots/budgets.png) | ![Settings](screenshots/settings.png) |
 
-### Scan & Menu
-Scan receipts and access the navigation drawer.
+### Log in & Menu
+Log in and access the navigation drawer.
 
 | Log In | Menu |
 |--------------|------|
